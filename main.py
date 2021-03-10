@@ -16,5 +16,5 @@ fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 
 for i in range(4):
-    ax.scatter(coordArray[i, :, :], coordArray[:, i, :], coordArray[:, :, i], c="black")
+    ax.scatter(coordArray[0], coordArray[1], coordArray[2], c="black")
 plt.show()
