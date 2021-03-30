@@ -1,7 +1,9 @@
-import matplotlib as mpl
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
-import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib import pyplot as plt
+import seaborn as sns
+from mpl_toolkits.mplot3d import Axes3D
+
 
 # Make this bigger to generate a dense grid.
 N = 4
@@ -24,14 +26,33 @@ c = np.tile(volume.ravel()[:, None], [1, 3])
 # if
 
 # Do the plotting in a single call.
+
 fig = plt.figure()
-ax = fig.gca(projection='3d')
+ax = Axes3D(fig)
+
+plt.xticks(np.arange(1, 5, 1))
+plt.yticks(np.arange(1, 5, 1))
+
+ax.set_zticks(np.arange(1, 5, 1))
+
 ax.scatter(x.ravel(),
            y.ravel(),
            z.ravel(),
-           s=400,
-           c="grey")
+           s=100,
+           c="grey", linewidths=2)
 
-ax.scatter(1, 2, 3, s=500, c="blue", marker="h")
-ax.scatter(3, 3, 3, s=500, c="blue", marker="h")
+plt.xlabel("x axis", fontsize=10, rotation=1)
+plt.ylabel("y axis", fontsize=10, rotation=1)
+ax.set_zlabel('z axis', fontsize=10, rotation=1)
+# plt.zlabel("z axis")
+# ax.scatter(1, 2, 3, s=500, c="blue", marker="h")
 plt.show()
+# input("1")
+# ax.scatter(3, 3, 3, s=500, c="blue", marker="h")
+# plt.show()
+# input("2")
+# ax.scatter(3, 3, 3, s=500, c="green", marker="h")
+# plt.show()
+
+# input("1")
+# input("2")
