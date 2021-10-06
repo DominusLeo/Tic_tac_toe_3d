@@ -62,11 +62,26 @@ def input_coords(i, stack: dict, ax, color):
         print('this turn is impossible\n')
         coords = input_coords(i, stack, ax, color)
 
-    # stack[color].append(coords)
-
     return coords
 
 
 def render_turn(i, ax, fig, turn, color):
     ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
     fig.show()
+
+
+def gravity_correction(coords, stack, gravity=True):
+    line_stack = [*itertools.chain(*stack.values())]
+
+    if gravity:
+        if coords[-1] == 1:
+            return coords
+        else:
+            temp = coords.copy()
+            temp[-1] = temp[-1] - 1
+            if temp in line_stack:
+                return coords
+            else:
+                return gravity_correction(temp, stack, gravity)
+    else:
+        return coords
