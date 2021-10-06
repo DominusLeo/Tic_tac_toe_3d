@@ -1,5 +1,4 @@
 from matplotlib.widgets import TextBox
-from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
@@ -23,7 +22,7 @@ def init_field():
 
     for x in range(1, 5):
         for y in range(1, 5):
-            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, 4, 100), ys=np.linspace(y, y, 100), c="grey")
+            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, 4, 100), ys=np.linspace(y, y, 100), c="grey", linewidth=5, alpha=0.8)
 
     # i dont know how make it
     ax.set_title(f"Tic Tac Toe 3d")
@@ -69,5 +68,5 @@ def input_coords(i, stack: dict, ax, color):
 
 
 def render_turn(i, ax, fig, turn, color):
-    ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=2)
+    ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
     fig.show()
