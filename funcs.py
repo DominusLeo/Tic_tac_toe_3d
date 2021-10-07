@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import itertools
 import seaborn as sns
 
+from constants import Configs
+
 
 sns.set(style='darkgrid')
 
@@ -12,26 +14,27 @@ def init_field():
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
-    ax.set_xticks(np.arange(1, 5, 1))
-    ax.set_yticks(np.arange(1, 5, 1))
-    ax.set_zticks(np.arange(1, 5, 1))
+    ax.set_xticks(np.arange(1, Configs.SHAPE + 1, 1))
+    ax.set_yticks(np.arange(1, Configs.SHAPE + 1, 1))
+    ax.set_zticks(np.arange(1, Configs.SHAPE + 1, 1))
 
     ax.set_xlabel('x axis', fontsize=10, rotation=1)
     ax.set_ylabel('y axis', fontsize=10, rotation=1)
     ax.set_zlabel('z axis', fontsize=10, rotation=1)
 
-    for x in range(1, 5):
-        for y in range(1, 5):
-            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, 4, 100), ys=np.linspace(y, y, 100), c="grey", linewidth=5, alpha=0.8)
+    for x in range(1, Configs.SHAPE + 1):
+        for y in range(1, Configs.SHAPE + 1):
+            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE + 1, 100), ys=np.linspace(y, y, 100),
+                    c="grey", linewidth=5, alpha=0.8)
 
     # i dont know how make it
-    ax.set_title(f"Tic Tac Toe 3d")
+    ax.set_title(f"Tic Tac Toe 3d") if Configs.GRAVITY else ax.set_title(f"Levitating Tic Tac Toe 3d")
     # ax.set_label(f"Tic Tac Toe 3d")
     ax.legend()
 
     # WA for good scaling
     ax.scatter3D(0, 0, 1, s=1, c="w")
-    ax.scatter3D(5, 5, 4, s=1, c="w")
+    ax.scatter3D(Configs.SHAPE + 1, Configs.SHAPE + 1, Configs.SHAPE, s=1, c="w")
     fig.show()
 
     return fig, ax
@@ -57,7 +60,7 @@ def input_coords(i, stack: dict, ax, color):
 
     if (coords in [*itertools.chain(*stack.values())]) \
             or any(np.array(coords) < 1) \
-            or any(np.array(coords) > 4) \
+            or any(np.array(coords) > Configs.SHAPE) \
             or len(coords) != 3:
         print('this turn is impossible\n')
         coords = input_coords(i, stack, ax, color)
@@ -70,10 +73,10 @@ def render_turn(i, ax, fig, turn, color):
     fig.show()
 
 
-def gravity_correction(coords, stack, gravity=True):
+def gravity_correction(coords, stack):
     line_stack = [*itertools.chain(*stack.values())]
 
-    if gravity:
+    if Configs.GRAVITY:
         if coords[-1] == 1:
             return coords
         else:
@@ -82,6 +85,6 @@ def gravity_correction(coords, stack, gravity=True):
             if temp in line_stack:
                 return coords
             else:
-                return gravity_correction(temp, stack, gravity)
+                return gravity_correction(temp, stack)
     else:
         return coords
