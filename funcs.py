@@ -1,11 +1,12 @@
+import time
 from matplotlib.widgets import TextBox
+import sympy
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 import seaborn as sns
 
-from constants import Configs
-
+from constants import Configs, DIMENSION
 
 sns.set(style='darkgrid')
 
@@ -24,13 +25,11 @@ def init_field():
 
     for x in range(1, Configs.SHAPE + 1):
         for y in range(1, Configs.SHAPE + 1):
-            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE + 1, 100), ys=np.linspace(y, y, 100),
+            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE, 100), ys=np.linspace(y, y, 100),
                     c="grey", linewidth=5, alpha=0.8)
 
-    # i dont know how make it
     ax.set_title(f"Tic Tac Toe 3d") if Configs.GRAVITY else ax.set_title(f"Levitating Tic Tac Toe 3d")
-    # ax.set_label(f"Tic Tac Toe 3d")
-    ax.legend()
+    # ax.legend()
 
     # WA for good scaling
     ax.scatter3D(0, 0, 1, s=1, c="w")
@@ -41,8 +40,16 @@ def init_field():
 
 
 def input_coords(i, stack: dict, ax, color):
+    if Configs.debug_mod:
+        coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
+        if coords in itertools.chain(*stack.values()):
+            return input_coords(i, stack, ax, color)
+        else:
+            input()
+            return coords
+
     try:
-        # TODO: [06.10.2021 by Lev]
+        # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
         # text_box = TextBox(ax, f"{color} player {i % 2 + 1}\nprint your coords: ")
         # print(text_box.text)
         # input_data = text_box.on_submit(print)
@@ -61,14 +68,14 @@ def input_coords(i, stack: dict, ax, color):
     if (coords in [*itertools.chain(*stack.values())]) \
             or any(np.array(coords) < 1) \
             or any(np.array(coords) > Configs.SHAPE) \
-            or len(coords) != 3:
+            or len(coords) != DIMENSION:
         print('this turn is impossible\n')
         coords = input_coords(i, stack, ax, color)
 
     return coords
 
 
-def render_turn(i, ax, fig, turn, color):
+def render_turn(ax, fig, turn, color):
     ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
     fig.show()
 
@@ -88,3 +95,18 @@ def gravity_correction(coords, stack):
                 return gravity_correction(temp, stack)
     else:
         return coords
+
+
+def win_check(stack, coords, color):
+    for line in itertools.combinations(stack[color], Configs.SHAPE):
+        if (coords in line) and sympy.Point.is_collinear(*line):
+            return line
+    return False
+
+
+def line_render(line_points, color):
+    fig, ax = init_field()
+
+    for i in line_points:
+        ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
+    fig.show()
