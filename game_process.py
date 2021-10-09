@@ -9,12 +9,12 @@ from constants import Configs, DIMENSION
 from funcs import init_field, input_coords, render_turn, gravity_correction, win_check, line_render
 
 
-Configs.GRAVITY = True
+Configs.debug_mod = False  # random turns by pc without players decisions - input()
+
+Configs.GRAVITY = True  # auto turns by PC for debug
 Configs.SHAPE = 4  # must be less then 10 (WA)
 Configs.stack = {'blue': [], "green": []}  # set color and name for every player, used by matplotlib
-
-Configs.debug_mod = False  # random turns by pc without players decisions - input()
-Configs.play_vs_bot = 1
+Configs.play_vs_bot = 2  # 0, 1, 2 - the presence and number of the bot's move
 
 
 if __name__ == "__main__":
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     stack = Configs.stack
 
     for i in trange(Configs.SHAPE ** DIMENSION):
-        color = list(stack.keys())[0] if i % 2 else list(stack.keys())[1]
+        color = list(stack.keys())[i % 2]
 
         turn = input_coords(i=i, stack=stack, ax=ax, color=color)
         if not turn: break

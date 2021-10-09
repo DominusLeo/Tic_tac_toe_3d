@@ -1,3 +1,4 @@
+import copy
 import time
 import sympy
 import numpy as np
@@ -40,6 +41,38 @@ def init_field():
     return fig, ax
 
 
+def gravity_correction(coords, stack):
+    if Configs.GRAVITY:
+        if coords[-1] == 1:
+            return coords
+        else:
+            temp = coords.copy()
+            temp[-1] = temp[-1] - 1
+            if temp in itertools.chain(*stack.values()):
+                return coords
+            else:
+                return gravity_correction(temp, stack)
+    else:
+        return coords
+
+
+old_lines = set()
+
+
+def win_check(stack, coords, color):
+    for line in itertools.combinations(stack[color], Configs.SHAPE):
+        if coords in line:
+            temp_line = line
+            # temp_line = tuple(tuple(i) for i in line)
+            # if temp_line in old_lines:
+            #     continue
+            # else:
+            #     old_lines.add(temp_line)
+            if sympy.Point.is_collinear(*temp_line):
+                return temp_line
+    return False
+
+
 def input_coords(i, stack: dict, ax, color):
     if Configs.debug_mod:
         coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
@@ -53,12 +86,26 @@ def input_coords(i, stack: dict, ax, color):
 
     if Configs.play_vs_bot:
         cond = (i + Configs.play_vs_bot) % 2
+
         if cond:
-            coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
-            if coords in itertools.chain(*stack.values()):
-                return input_coords(i, stack, ax, color)
-            else:
-                return coords
+            coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
+            coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
+            coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+
+            for coord in coords_arr:
+                temp_stack = copy.deepcopy(stack)
+                temp_stack[color].append(coord)
+                if win_check(temp_stack, coord, color):
+                    return coord
+
+            enemy_color = list(stack.keys())[(i + 1) % 2]
+            for coord in coords_arr:
+                temp_stack = copy.deepcopy(stack)
+                temp_stack[enemy_color].append(coord)
+                if win_check(temp_stack, coord, enemy_color):
+                    return coord
+
+            return coords_arr[np.random.randint(len(coords_arr))]
 
     try:
         # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
@@ -92,21 +139,6 @@ def render_turn(ax, fig, turn, color):
     fig.show()
 
 
-def gravity_correction(coords, stack):
-    if Configs.GRAVITY:
-        if coords[-1] == 1:
-            return coords
-        else:
-            temp = coords.copy()
-            temp[-1] = temp[-1] - 1
-            if temp in itertools.chain(*stack.values()):
-                return coords
-            else:
-                return gravity_correction(temp, stack)
-    else:
-        return coords
-
-
 # @njit(cache=True, nogil=True, fastmath=True)
 # def _win_check(st, cl, sh, cmbs):
 #     for line in cmbs:
@@ -118,23 +150,6 @@ def gravity_correction(coords, stack):
 # def win_check(stack, coords, color):
 #     combs = np.array([i for i in itertools.combinations(stack[color], Configs.SHAPE) if coords in i])
 #     return _win_check(stack[color], coords, Configs.SHAPE, combs)
-
-
-old_lines = set()
-
-
-def win_check(stack, coords, color):
-    for line in itertools.combinations(stack[color], Configs.SHAPE):
-        if coords in line:
-            temp_line = line
-            # temp_line = tuple(tuple(i) for i in line)
-            # if temp_line in old_lines:
-            #     continue
-            # else:
-            #     old_lines.add(temp_line)
-            if sympy.Point.is_collinear(*temp_line):
-                return temp_line
-    return False
 
 
 def line_render(stack_render):
