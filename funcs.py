@@ -1,10 +1,11 @@
 import time
-from matplotlib.widgets import TextBox
 import sympy
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
 import seaborn as sns
+from matplotlib.widgets import TextBox
+# from numba import jit, cuda, njit
 
 from constants import Configs, DIMENSION
 
@@ -45,8 +46,19 @@ def input_coords(i, stack: dict, ax, color):
         if coords in itertools.chain(*stack.values()):
             return input_coords(i, stack, ax, color)
         else:
-            input()
+            # a = input()
+            # if len(a) == 1:
+            #     return
             return coords
+
+    if Configs.play_vs_bot:
+        cond = (i + Configs.play_vs_bot) % 2
+        if cond:
+            coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
+            if coords in itertools.chain(*stack.values()):
+                return input_coords(i, stack, ax, color)
+            else:
+                return coords
 
     try:
         # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
@@ -65,7 +77,7 @@ def input_coords(i, stack: dict, ax, color):
     if len(coords) == 1:
         return
 
-    if (coords in [*itertools.chain(*stack.values())]) \
+    if (coords in itertools.chain(*stack.values())) \
             or any(np.array(coords) < 1) \
             or any(np.array(coords) > Configs.SHAPE) \
             or len(coords) != DIMENSION:
@@ -81,15 +93,13 @@ def render_turn(ax, fig, turn, color):
 
 
 def gravity_correction(coords, stack):
-    line_stack = [*itertools.chain(*stack.values())]
-
     if Configs.GRAVITY:
         if coords[-1] == 1:
             return coords
         else:
             temp = coords.copy()
             temp[-1] = temp[-1] - 1
-            if temp in line_stack:
+            if temp in itertools.chain(*stack.values()):
                 return coords
             else:
                 return gravity_correction(temp, stack)
@@ -97,16 +107,40 @@ def gravity_correction(coords, stack):
         return coords
 
 
+# @njit(cache=True, nogil=True, fastmath=True)
+# def _win_check(st, cl, sh, cmbs):
+#     for line in cmbs:
+#         if sympy.Point.is_collinear(*line):
+#             return line
+#     return False
+#
+#
+# def win_check(stack, coords, color):
+#     combs = np.array([i for i in itertools.combinations(stack[color], Configs.SHAPE) if coords in i])
+#     return _win_check(stack[color], coords, Configs.SHAPE, combs)
+
+
+old_lines = set()
+
+
 def win_check(stack, coords, color):
     for line in itertools.combinations(stack[color], Configs.SHAPE):
-        if (coords in line) and sympy.Point.is_collinear(*line):
-            return line
+        if coords in line:
+            temp_line = line
+            # temp_line = tuple(tuple(i) for i in line)
+            # if temp_line in old_lines:
+            #     continue
+            # else:
+            #     old_lines.add(temp_line)
+            if sympy.Point.is_collinear(*temp_line):
+                return temp_line
     return False
 
 
-def line_render(line_points, color):
+def line_render(stack_render):
     fig, ax = init_field()
 
-    for i in line_points:
-        ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
+    for color in stack_render:
+        for i in stack_render[color]:
+            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
     fig.show()

@@ -2,6 +2,8 @@ import itertools
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import copy
+from tqdm import trange
 
 from constants import Configs, DIMENSION
 from funcs import init_field, input_coords, render_turn, gravity_correction, win_check, line_render
@@ -10,14 +12,16 @@ from funcs import init_field, input_coords, render_turn, gravity_correction, win
 Configs.GRAVITY = True
 Configs.SHAPE = 4  # must be less then 10 (WA)
 Configs.stack = {'blue': [], "green": []}  # set color and name for every player, used by matplotlib
+
 Configs.debug_mod = False  # random turns by pc without players decisions - input()
+Configs.play_vs_bot = 1
 
 
 if __name__ == "__main__":
     fig, ax = init_field()
     stack = Configs.stack
 
-    for i in range(Configs.SHAPE ** DIMENSION):
+    for i in trange(Configs.SHAPE ** DIMENSION):
         color = list(stack.keys())[0] if i % 2 else list(stack.keys())[1]
 
         turn = input_coords(i=i, stack=stack, ax=ax, color=color)
@@ -29,9 +33,10 @@ if __name__ == "__main__":
         render_turn(ax=ax, fig=fig, turn=turn, color=color)
 
         is_win = win_check(stack=stack, coords=turn, color=color)
+        # is_win = False
         if is_win:
             print(f"{color} player win")
-            line_render(line_points=is_win, color=color)
+            line_render(stack_render={color: is_win})
             break
 
     input('end\n')

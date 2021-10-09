@@ -7,3 +7,4 @@ class Configs:
     debug_mod = False
 
     stack = {'red': [], "green": []}
+    play_vs_bot = 0
