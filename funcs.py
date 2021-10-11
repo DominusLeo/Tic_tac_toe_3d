@@ -4,11 +4,13 @@ import sympy
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
+import csv
 import seaborn as sns
-from matplotlib.widgets import TextBox
+from tqdm import tqdm
+# from matplotlib.widgets import TextBox
 # from numba import jit, cuda, njit
 
-from constants import Configs, DIMENSION
+from constants import Configs, DIMENSION, dict_of_shapes_wins
 
 sns.set(style='darkgrid')
 
@@ -56,24 +58,66 @@ def gravity_correction(coords, stack):
         return coords
 
 
-old_lines = set()
+def fill_all_field():
+    stack = {'red': [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]}
+    return stack
 
 
-def win_check(stack, coords, color):
+# single uses
+def all_win_lines():
+    field = fill_all_field()
+    lines_stack = set()
+
+    for line in tqdm(itertools.combinations(field['red'], Configs.SHAPE)):
+        if sympy.Point.is_collinear(*line):
+            lines_stack.add(tuple(tuple(i) for i in line))
+    return lines_stack
+
+
+def win_check_from_db(stack, coords, color):
     for line in itertools.combinations(stack[color], Configs.SHAPE):
         if coords in line:
-            temp_line = line
-            # temp_line = tuple(tuple(i) for i in line)
-            # if temp_line in old_lines:
-            #     continue
-            # else:
-            #     old_lines.add(temp_line)
-            if sympy.Point.is_collinear(*temp_line):
-                return temp_line
+            for perm in itertools.permutations(line):
+                if perm in dict_of_shapes_wins[Configs.SHAPE]:
+                    return line
     return False
 
 
+def bot_first_level():
+    return
+
+
 def input_coords(i, stack: dict, ax, color):
+    if Configs.play_vs_bot:
+        cond = (i + Configs.play_vs_bot) % 2
+
+        if cond:
+            # all possible turns list
+            coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
+            coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
+            coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+
+            # check for win turns
+            for coord in coords_arr:
+                temp_stack = copy.deepcopy(stack)
+                temp_stack[color].append(coord)
+                if win_check_from_db(temp_stack, coord, color):
+                    print(f'{color} turn: {coord}')
+                    return coord
+
+            # check for loosing turns
+            enemy_color = list(stack.keys())[(i + 1) % 2]
+            for coord in coords_arr:
+                temp_stack = copy.deepcopy(stack)
+                temp_stack[enemy_color].append(coord)
+                if win_check_from_db(temp_stack, coord, enemy_color):
+                    print(f'{color} turn: {coord}')
+                    return coord
+
+            coord = coords_arr[np.random.randint(len(coords_arr))]
+            print(f'{color} turn: {coord}')
+            return coord
+
     if Configs.debug_mod:
         coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
         if coords in itertools.chain(*stack.values()):
@@ -82,30 +126,8 @@ def input_coords(i, stack: dict, ax, color):
             # a = input()
             # if len(a) == 1:
             #     return
+            print(f'{color} turn: {coords}')
             return coords
-
-    if Configs.play_vs_bot:
-        cond = (i + Configs.play_vs_bot) % 2
-
-        if cond:
-            coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
-            coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
-            coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
-
-            for coord in coords_arr:
-                temp_stack = copy.deepcopy(stack)
-                temp_stack[color].append(coord)
-                if win_check(temp_stack, coord, color):
-                    return coord
-
-            enemy_color = list(stack.keys())[(i + 1) % 2]
-            for coord in coords_arr:
-                temp_stack = copy.deepcopy(stack)
-                temp_stack[enemy_color].append(coord)
-                if win_check(temp_stack, coord, enemy_color):
-                    return coord
-
-            return coords_arr[np.random.randint(len(coords_arr))]
 
     try:
         # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
@@ -139,6 +161,17 @@ def render_turn(ax, fig, turn, color):
     fig.show()
 
 
+# #FIXME: [10.10.2021 by Lev] multilines
+def line_render(stack_render):
+    fig, ax = init_field()
+
+    for color in stack_render:
+        for i in stack_render[color]:
+            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
+    fig.show()
+
+
+# # scratches___________________________________________________________________________________________________________
 # @njit(cache=True, nogil=True, fastmath=True)
 # def _win_check(st, cl, sh, cmbs):
 #     for line in cmbs:
@@ -152,10 +185,68 @@ def render_turn(ax, fig, turn, color):
 #     return _win_check(stack[color], coords, Configs.SHAPE, combs)
 
 
-def line_render(stack_render):
-    fig, ax = init_field()
+old_lines = set()
 
-    for color in stack_render:
-        for i in stack_render[color]:
-            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
-    fig.show()
+
+def win_check(stack, coords, color):
+    for line in itertools.combinations(stack[color], Configs.SHAPE):
+        if coords in line:
+            temp_line = line
+            # temp_line = tuple(tuple(i) for i in line)
+            # if temp_line in old_lines:
+            #     continue
+            # else:
+            #     old_lines.add(temp_line)
+            if sympy.Point.is_collinear(*temp_line):
+                return temp_line
+    return False
+
+
+corners = [[1, 1, 1], [1, 1, 4],
+           [4, 4, 4], [4, 4, 1],
+           [1, 4, 1], [1, 4, 4],
+           [4, 1, 1], [4, 1, 4]]
+
+
+def fast_win_check(stack=None, coords=None, color='green'):
+    all_poss_lines = []
+
+    for i in range(DIMENSION):
+        temp_line_one = []
+        temp_line_two = []
+        temp_line_three = []
+
+        for j in range(Configs.SHAPE):
+            temp_turn = coords.copy()
+            temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
+            temp_line_one.append(temp_turn)
+
+            temp_turn = coords.copy()
+            temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
+            temp_turn[i - 1] = (temp_turn[i - 1] + j) % Configs.SHAPE + 1
+            temp_line_two.append(temp_turn)
+
+            if coords in corners:
+                temp_turn = coords.copy()
+                temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
+                temp_turn[i - 1] = (temp_turn[i - 1] + j) % Configs.SHAPE + 1
+                temp_turn[i - 2] = (temp_turn[i - 2] + j) % Configs.SHAPE + 1
+                temp_line_three.append(temp_turn)
+
+        all_poss_lines.append(temp_line_one)
+        if temp_line_two:
+            all_poss_lines.append(temp_line_two)
+        if temp_line_three:
+            all_poss_lines.append(temp_line_three)
+
+    return all_poss_lines
+
+
+# with open('4x4x4.csv', 'w') as f:
+#     # using csv.writer method from CSV package
+#     write = csv.writer(f)
+#     write.writerows(list(aaa))
+
+# with open('4x4x4.csv', newline='\n') as f:
+#     reader = csv.reader(f)
+#     data = list(reader)

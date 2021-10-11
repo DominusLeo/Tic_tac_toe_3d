@@ -5,9 +5,8 @@ import seaborn as sns
 import copy
 from tqdm import trange
 
-from constants import Configs, DIMENSION
-from funcs import init_field, input_coords, render_turn, gravity_correction, win_check, line_render
-
+from constants import Configs, DIMENSION, dict_of_shapes_wins
+from funcs import init_field, input_coords, render_turn, gravity_correction, win_check, line_render, win_check_from_db
 
 Configs.debug_mod = False  # random turns by pc without players decisions - input()
 
@@ -32,7 +31,7 @@ if __name__ == "__main__":
 
         render_turn(ax=ax, fig=fig, turn=turn, color=color)
 
-        is_win = win_check(stack=stack, coords=turn, color=color)
+        is_win = win_check_from_db(stack=stack, coords=turn, color=color)
         # is_win = False
         if is_win:
             print(f"{color} player win")
