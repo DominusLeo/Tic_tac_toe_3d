@@ -77,9 +77,8 @@ def all_win_lines():
 def win_check_from_db(stack, coords, color):
     for line in itertools.combinations(stack[color], Configs.SHAPE):
         if coords in line:
-            for perm in itertools.permutations(line):
-                if perm in dict_of_shapes_wins[Configs.SHAPE]:
-                    return line
+            if set([tuple(i) for i in line]) in dict_of_shapes_wins[Configs.SHAPE]:
+                return line
     return False
 
 
