@@ -10,21 +10,23 @@ from funcs import init_field, input_coords, render_turn, gravity_correction, win
 
 Configs.debug_mod = False  # random turns by pc without players decisions - input()
 
-Configs.GRAVITY = True  # auto turns by PC for debug
-Configs.SHAPE = 4  # must be less then 10 (WA)
-Configs.stack = {'blue': [], "green": []}  # set color and name for every player, used by matplotlib
+Configs.GRAVITY = True
+Configs.SHAPE = 4  # must be in range(3, 10) (WA)
+Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 Configs.play_vs_bot = 2  # 0, 1, 2 - the presence and number of the bot's move
 
 
+# win_stat = copy.deepcopy(Configs.stack)
+# for trying in trange(15):
 if __name__ == "__main__":
     fig, ax = init_field()
-    stack = Configs.stack
+    stack = copy.deepcopy(Configs.stack)
 
     for i in trange(Configs.SHAPE ** DIMENSION):
         color = list(stack.keys())[i % 2]
 
-        turn = input_coords(i=i, stack=stack, ax=ax, color=color)
-        if not turn: break
+        turn = input_coords(i=i, stack=stack, color=color)
+        if not turn: break  # WA for exit
 
         turn = gravity_correction(coords=turn, stack=stack)
         stack[color].append(turn)
@@ -39,3 +41,4 @@ if __name__ == "__main__":
             break
 
     input('end\n')
+        # win_stat[color].append(i)

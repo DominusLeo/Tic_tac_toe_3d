@@ -66,11 +66,11 @@ def fill_all_field():
 # single uses
 def all_win_lines():
     field = fill_all_field()
-    lines_stack = set()
+    lines_stack = []
 
     for line in tqdm(itertools.combinations(field['red'], Configs.SHAPE)):
         if sympy.Point.is_collinear(*line):
-            lines_stack.add(tuple(tuple(i) for i in line))
+            lines_stack.append(set(tuple(i) for i in line))
     return lines_stack
 
 
@@ -86,7 +86,7 @@ def bot_first_level():
     return
 
 
-def input_coords(i, stack: dict, ax, color):
+def input_coords(i, stack: dict, color):
     if Configs.play_vs_bot:
         cond = (i + Configs.play_vs_bot) % 2
 
@@ -113,14 +113,25 @@ def input_coords(i, stack: dict, ax, color):
                     print(f'{color} turn: {coord}')
                     return coord
 
-            coord = coords_arr[np.random.randint(len(coords_arr))]
+            # coord = coords_arr[np.random.randint(len(coords_arr))]
+
+            # check for not turning under loose
+            for coord in [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]:
+                temp_stack = copy.deepcopy(stack)
+                temp_coord = copy.deepcopy(coord)
+                temp_coord[-1] += 1
+                temp_stack[enemy_color].append(temp_coord)
+                if not win_check_from_db(temp_stack, temp_coord, enemy_color):
+                    print(f'{color} turn: {coord}')
+                    return coord
+
             print(f'{color} turn: {coord}')
             return coord
 
     if Configs.debug_mod:
         coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
         if coords in itertools.chain(*stack.values()):
-            return input_coords(i, stack, ax, color)
+            return input_coords(i, stack, color)
         else:
             # a = input()
             # if len(a) == 1:
@@ -139,7 +150,7 @@ def input_coords(i, stack: dict, ax, color):
         print()
     except:  # TODO: [06.10.2021 by Lev] set right exception
         print("input is wrong\n")
-        coords = input_coords(i, stack, ax, color)
+        coords = input_coords(i, stack, color)
 
     # WA for exit
     if len(coords) == 1:
@@ -150,7 +161,7 @@ def input_coords(i, stack: dict, ax, color):
             or any(np.array(coords) > Configs.SHAPE) \
             or len(coords) != DIMENSION:
         print('this turn is impossible\n')
-        coords = input_coords(i, stack, ax, color)
+        coords = input_coords(i, stack, color)
 
     return coords
 
@@ -166,7 +177,7 @@ def line_render(stack_render):
 
     for color in stack_render:
         for i in stack_render[color]:
-            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
+            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.7, edgecolors='black')
     fig.show()
 
 
@@ -201,44 +212,52 @@ def win_check(stack, coords, color):
     return False
 
 
-corners = [[1, 1, 1], [1, 1, 4],
-           [4, 4, 4], [4, 4, 1],
-           [1, 4, 1], [1, 4, 4],
-           [4, 1, 1], [4, 1, 4]]
+def win_check_from_db1(stack, coords, color):
+    a = set([frozenset(tuple(i) for i in line) for line in itertools.combinations(stack[color], Configs.SHAPE) if coords in line])
+    b = a & dict_of_shapes_wins[Configs.SHAPE]
+    for i in b:
+        return i
+    return False
 
 
-def fast_win_check(stack=None, coords=None, color='green'):
-    all_poss_lines = []
-
-    for i in range(DIMENSION):
-        temp_line_one = []
-        temp_line_two = []
-        temp_line_three = []
-
-        for j in range(Configs.SHAPE):
-            temp_turn = coords.copy()
-            temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
-            temp_line_one.append(temp_turn)
-
-            temp_turn = coords.copy()
-            temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
-            temp_turn[i - 1] = (temp_turn[i - 1] + j) % Configs.SHAPE + 1
-            temp_line_two.append(temp_turn)
-
-            if coords in corners:
-                temp_turn = coords.copy()
-                temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
-                temp_turn[i - 1] = (temp_turn[i - 1] + j) % Configs.SHAPE + 1
-                temp_turn[i - 2] = (temp_turn[i - 2] + j) % Configs.SHAPE + 1
-                temp_line_three.append(temp_turn)
-
-        all_poss_lines.append(temp_line_one)
-        if temp_line_two:
-            all_poss_lines.append(temp_line_two)
-        if temp_line_three:
-            all_poss_lines.append(temp_line_three)
-
-    return all_poss_lines
+# corners = [[1, 1, 1], [1, 1, 4],
+#            [4, 4, 4], [4, 4, 1],
+#            [1, 4, 1], [1, 4, 4],
+#            [4, 1, 1], [4, 1, 4]]
+#
+#
+# def fast_win_check(stack=None, coords=None, color='green'):
+#     all_poss_lines = []
+#
+#     for i in range(DIMENSION):
+#         temp_line_one = []
+#         temp_line_two = []
+#         temp_line_three = []
+#
+#         for j in range(Configs.SHAPE):
+#             temp_turn = coords.copy()
+#             temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
+#             temp_line_one.append(temp_turn)
+#
+#             temp_turn = coords.copy()
+#             temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
+#             temp_turn[i - 1] = (temp_turn[i - 1] + j) % Configs.SHAPE + 1
+#             temp_line_two.append(temp_turn)
+#
+#             if coords in corners:
+#                 temp_turn = coords.copy()
+#                 temp_turn[i] = (temp_turn[i] + j) % Configs.SHAPE + 1
+#                 temp_turn[i - 1] = (temp_turn[i - 1] + j) % Configs.SHAPE + 1
+#                 temp_turn[i - 2] = (temp_turn[i - 2] + j) % Configs.SHAPE + 1
+#                 temp_line_three.append(temp_turn)
+#
+#         all_poss_lines.append(temp_line_one)
+#         if temp_line_two:
+#             all_poss_lines.append(temp_line_two)
+#         if temp_line_three:
+#             all_poss_lines.append(temp_line_three)
+#
+#     return all_poss_lines
 
 
 # with open('4x4x4.csv', 'w') as f:
