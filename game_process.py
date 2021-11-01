@@ -9,12 +9,12 @@ from constants import Configs, DIMENSION, dict_of_shapes_wins
 from funcs import init_field, input_coords, render_turn, gravity_correction, win_check, line_render, win_check_from_db, \
     easy_bot_turn, debug_turn
 
-Configs.debug_mod = False  # random turns by pc without players decisions - input()
+Configs.debug_mod = False  # random turns by pc without players decisions
 
 Configs.GRAVITY = True
 Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
-Configs.play_vs_bot = 2  # 0, 1, 2 - the presence and number of the bot's move
+Configs.play_vs_bot = 0  # 0, 1, 2 - the presence and number of the bot's move
 
 
 # win_stat = copy.deepcopy(Configs.stack)
@@ -23,7 +23,9 @@ if __name__ == "__main__":
     fig, ax = init_field()
     stack = copy.deepcopy(Configs.stack)
 
-    for i in trange(Configs.SHAPE ** DIMENSION):
+    cancels = 0
+
+    for i in trange(Configs.SHAPE ** DIMENSION + cancels):
         color = list(stack.keys())[i % 2]
 
         # turns logic
@@ -34,6 +36,16 @@ if __name__ == "__main__":
                 turn = debug_turn(i=i, stack=stack, color=color)
             else:
                 turn = input_coords(i=i, stack=stack, color=color)
+
+        # logic for canceling last turn
+        if turn == "cancel":
+            cancels += 2
+            stack[color].pop(-1)
+            stack[list(stack.keys())[i % 2 - 1]].pop(-1)
+
+            ax, fig = line_render(stack_render=stack)
+
+            turn = input_coords(i=i, stack=stack, color=color)
 
         if turn == "exit": break  # WA for exit
 

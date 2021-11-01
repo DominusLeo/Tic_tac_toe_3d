@@ -2,12 +2,13 @@ DIMENSION = 3
 
 
 class Configs:
-    GRAVITY = True
-    SHAPE = 4
-    debug_mod = False
+    debug_mod = False  # random turns by pc without players decisions
 
-    stack = {'red': [], "green": []}
-    play_vs_bot = 0
+    GRAVITY = True     # set or not mod when chips will fall on the lowest position or will levitate in set coords
+    SHAPE = 4          # must be in range(3, 10) (WA)
+    play_vs_bot = 0    # 0, 1, 2 - the presence and number of the bot's move
+
+    stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 
 
 dict_of_shapes_wins = {i: [] for i in range(2, 10)}

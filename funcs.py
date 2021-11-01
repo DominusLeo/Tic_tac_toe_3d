@@ -87,12 +87,6 @@ def bot_first_level():
 
 
 def input_coords(i, stack: dict, color):
-    if Configs.play_vs_bot:  # rudiment
-        pass
-
-    if Configs.debug_mod:  # rudiment
-        pass
-
     input_data = input(f"{color} player {i % 2 + 1}\nprint your coords: ")
 
     # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
@@ -111,6 +105,7 @@ def input_coords(i, stack: dict, color):
 
         coords = [int(i) for i in input_data]
         print()
+
     except:  # TODO: [06.10.2021 by Lev] set right exception
         print("input is wrong\n")
         coords = input_coords(i, stack, color)
@@ -187,6 +182,7 @@ def line_render(stack_render):
         for i in stack_render[color]:
             ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.7, edgecolors='black')
     fig.show()
+    return ax, fig
 
 
 # # scratches___________________________________________________________________________________________________________
