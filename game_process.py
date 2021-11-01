@@ -1,7 +1,3 @@
-import itertools
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import copy
 from tqdm import trange
 
@@ -17,10 +13,8 @@ Configs.stack = {'red': [], "green": []}  # set color and name for every player,
 Configs.play_vs_bot = 0  # 0, 1, 2 - the presence and number of the bot's move
 
 
-# win_stat = copy.deepcopy(Configs.stack)
-# for trying in trange(15):
-if __name__ == "__main__":
-    fig, ax = init_field()
+def single_game(rendering=True):
+    fig, ax = init_field() if rendering else [None, None]
     stack = copy.deepcopy(Configs.stack)
 
     cancels = 0
@@ -52,14 +46,18 @@ if __name__ == "__main__":
         turn = gravity_correction(coords=turn, stack=stack)
         stack[color].append(turn)
 
-        render_turn(ax=ax, fig=fig, turn=turn, color=color)
+        render_turn(ax=ax, fig=fig, turn=turn, color=color) if rendering else None
 
         is_win = win_check_from_db(stack=stack, coords=turn, color=color)
         # is_win = False
         if is_win:
             print(f"{color} player win")
-            line_render(stack_render={color: is_win})
+            line_render(stack_render={color: is_win}) if rendering else None
             break
 
-    input('end\n')
-        # win_stat[color].append(i)
+    input('end\n') if rendering else None
+    return color, i
+
+
+if __name__ == "__main__":
+    single_game(rendering=True)
