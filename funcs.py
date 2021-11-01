@@ -87,74 +87,33 @@ def bot_first_level():
 
 
 def input_coords(i, stack: dict, color):
-    if Configs.play_vs_bot:
-        cond = (i + Configs.play_vs_bot) % 2
+    if Configs.play_vs_bot:  # rudiment
+        pass
 
-        if cond:
-            # all possible turns list
-            coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
-            coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
-            coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+    if Configs.debug_mod:  # rudiment
+        pass
 
-            # check for win turns
-            for coord in coords_arr:
-                temp_stack = copy.deepcopy(stack)
-                temp_stack[color].append(coord)
-                if win_check_from_db(temp_stack, coord, color):
-                    print(f'{color} turn: {coord}')
-                    return coord
+    input_data = input(f"{color} player {i % 2 + 1}\nprint your coords: ")
 
-            # check for loosing turns
-            enemy_color = list(stack.keys())[(i + 1) % 2]
-            for coord in coords_arr:
-                temp_stack = copy.deepcopy(stack)
-                temp_stack[enemy_color].append(coord)
-                if win_check_from_db(temp_stack, coord, enemy_color):
-                    print(f'{color} turn: {coord}')
-                    return coord
-
-            # coord = coords_arr[np.random.randint(len(coords_arr))]
-
-            # check for not turning under loose
-            for coord in [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]:
-                temp_stack = copy.deepcopy(stack)
-                temp_coord = copy.deepcopy(coord)
-                temp_coord[-1] += 1
-                temp_stack[enemy_color].append(temp_coord)
-                if not win_check_from_db(temp_stack, temp_coord, enemy_color):
-                    print(f'{color} turn: {coord}')
-                    return coord
-
-            print(f'{color} turn: {coord}')
-            return coord
-
-    if Configs.debug_mod:
-        coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
-        if coords in itertools.chain(*stack.values()):
-            return input_coords(i, stack, color)
-        else:
-            # a = input()
-            # if len(a) == 1:
-            #     return
-            print(f'{color} turn: {coords}')
-            return coords
+    # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
+    # text_box = TextBox(ax, f"{color} player {i % 2 + 1}\nprint your coords: ")
+    # print(text_box.text)
+    # input_data = text_box.on_submit(print)
 
     try:
-        # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
-        # text_box = TextBox(ax, f"{color} player {i % 2 + 1}\nprint your coords: ")
-        # print(text_box.text)
-        # input_data = text_box.on_submit(print)
+        # exit condition
+        if input_data == "exit":
+            return "exit"
 
-        input_data = input(f"{color} player {i % 2 + 1}\nprint your coords: ")
+        # rollback turn condition
+        if input_data == 'c':
+            return "cancel"
+
         coords = [int(i) for i in input_data]
         print()
     except:  # TODO: [06.10.2021 by Lev] set right exception
         print("input is wrong\n")
         coords = input_coords(i, stack, color)
-
-    # WA for exit
-    if len(coords) == 1:
-        return
 
     if (coords in itertools.chain(*stack.values())) \
             or any(np.array(coords) < 1) \
@@ -166,8 +125,57 @@ def input_coords(i, stack: dict, color):
     return coords
 
 
+def debug_turn(i, stack, color):
+    coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
+    if coords in itertools.chain(*stack.values()):
+        return debug_turn(i, stack, color)
+    else:
+        print(f'{color} turn: {coords}')
+        return coords
+
+
+def easy_bot_turn(i, stack, color):
+    cond = (i + Configs.play_vs_bot) % 2
+
+    if cond:
+        # all possible turns list
+        coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
+        coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
+        coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+
+        # check for win turns
+        for coord in coords_arr:
+            temp_stack = copy.deepcopy(stack)
+            temp_stack[color].append(coord)
+            if win_check_from_db(temp_stack, coord, color):
+                print(f'{color} turn: {coord}')
+                return coord
+
+        # check for loosing turns
+        enemy_color = list(stack.keys())[(i + 1) % 2]
+        for coord in coords_arr:
+            temp_stack = copy.deepcopy(stack)
+            temp_stack[enemy_color].append(coord)
+            if win_check_from_db(temp_stack, coord, enemy_color):
+                print(f'{color} turn: {coord}')
+                return coord
+
+        # check for not turning under loose
+        for coord in [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]:
+            temp_stack = copy.deepcopy(stack)
+            temp_coord = copy.deepcopy(coord)
+            temp_coord[-1] += 1
+            temp_stack[enemy_color].append(temp_coord)
+            if not win_check_from_db(temp_stack, temp_coord, enemy_color):
+                print(f'{color} turn: {coord}')
+                return coord
+
+        print(f'{color} turn: {coord}')
+        return coord
+
+
 def render_turn(ax, fig, turn, color):
-    ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.5, edgecolors='black')
+    ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.7, edgecolors='black')
     fig.show()
 
 

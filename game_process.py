@@ -6,7 +6,8 @@ import copy
 from tqdm import trange
 
 from constants import Configs, DIMENSION, dict_of_shapes_wins
-from funcs import init_field, input_coords, render_turn, gravity_correction, win_check, line_render, win_check_from_db
+from funcs import init_field, input_coords, render_turn, gravity_correction, win_check, line_render, win_check_from_db, \
+    easy_bot_turn, debug_turn
 
 Configs.debug_mod = False  # random turns by pc without players decisions - input()
 
@@ -25,8 +26,16 @@ if __name__ == "__main__":
     for i in trange(Configs.SHAPE ** DIMENSION):
         color = list(stack.keys())[i % 2]
 
-        turn = input_coords(i=i, stack=stack, color=color)
-        if not turn: break  # WA for exit
+        # turns logic
+        if (i % 2 + 1) == Configs.play_vs_bot:
+            turn = easy_bot_turn(i=i, stack=stack, color=color)
+        else:
+            if Configs.debug_mod:
+                turn = debug_turn(i=i, stack=stack, color=color)
+            else:
+                turn = input_coords(i=i, stack=stack, color=color)
+
+        if turn == "exit": break  # WA for exit
 
         turn = gravity_correction(coords=turn, stack=stack)
         stack[color].append(turn)
