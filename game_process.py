@@ -1,9 +1,9 @@
 import copy
 from tqdm import trange
 
-from constants import Configs, DIMENSION, dict_of_shapes_wins
-from funcs import init_field, input_coords, render_turn, gravity_correction, line_render, win_check_from_db, \
-    bot_turn, debug_turn
+from constants import Configs, DIMENSION
+from funcs import init_field, input_coords, render_turn, gravity_correction, line_render, win_check_from_db, bot_turn, \
+    leader_bord_stat
 
 
 Configs.GRAVITY = True
@@ -67,7 +67,8 @@ def single_game(rendering=True, range_func=trange):
             line_render(stack_render={color: is_win}) if rendering else None
             break
 
-    input('end\n') if rendering else None
+    if rendering and Configs.play_vs_bot and not Configs.debug_mod:
+        leader_bord_stat(i=i, your_turn=(i % 2 + 1), is_win=(i % 2 == Configs.play_vs_bot))
     return color, i
 
 
