@@ -3,24 +3,26 @@ from tqdm import trange
 
 from constants import Configs, DIMENSION, dict_of_shapes_wins
 from funcs import init_field, input_coords, render_turn, gravity_correction, line_render, win_check_from_db, \
-    easy_bot_turn, debug_turn
+    bot_turn, debug_turn
+
 
 Configs.debug_mod = False  # random turns by pc without players decisions
 
 Configs.GRAVITY = True
 Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
-Configs.play_vs_bot = 0  # 0, 1, 2 - the presence and number of the bot's move
+Configs.play_vs_bot = 1  # 0, 1, 2 - the presence and number of the bot's move
 Configs.second_bot = True
+Configs.bot_difficult = 2
 
 
-def single_game(rendering=True):
+def single_game(rendering=True, range_func=trange):
     fig, ax = init_field() if rendering else [None, None]
     stack = copy.deepcopy(Configs.stack)
 
     turn, cancels = 0, 0
 
-    for i in trange(Configs.SHAPE ** DIMENSION + cancels):
+    for i in range_func(Configs.SHAPE ** DIMENSION + cancels):
         # WA for multi canceling turns
         if turn == "cancel":
             turn = 0
@@ -30,11 +32,11 @@ def single_game(rendering=True):
 
         # turns logic
         if (i % 2 + 1) == Configs.play_vs_bot:
-            turn = easy_bot_turn(i=i, stack=stack, color=color)
+            turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.bot_difficult)
         else:
             if Configs.debug_mod:
                 if Configs.second_bot:
-                    turn = easy_bot_turn(i=i, stack=stack, color=color)
+                    turn = bot_turn(i=i, stack=stack, color=color, difficult=1)
                     input() if rendering else 0
                 else:
                     turn = debug_turn(i=i, stack=stack, color=color)

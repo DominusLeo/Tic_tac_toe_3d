@@ -14,12 +14,13 @@ Configs.GRAVITY = True
 Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 Configs.play_vs_bot = 2  # 0, 1, 2 - the presence and number of the bot's move
-Configs.second_bot = False
+Configs.second_bot = True
+Configs.bot_difficult = 2
 
 
 if __name__ == "__main__":
     win_stat = copy.deepcopy(Configs.stack)
 
-    for trying in trange(25):
-        color, i = single_game(rendering=False)
+    for trying in trange(40):
+        color, i = single_game(rendering=False, range_func=range)
         win_stat[color].append(i)

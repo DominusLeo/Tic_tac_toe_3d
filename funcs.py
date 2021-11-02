@@ -129,16 +129,36 @@ def debug_turn(i, stack, color):
         return coords
 
 
-def easy_bot_turn(i, stack, color):
+def free_lines_counter(stack, turn, enemy_color):
+    free_lines = []
+
+    possible_lines = [t for t in dict_of_shapes_wins[Configs.SHAPE] if tuple(turn) in t]
+
+    for line_set in possible_lines:
+        flag = True
+
+        for point in stack[enemy_color]:
+            if tuple(point) in line_set:
+                flag = False
+                break
+        if flag:
+            free_lines.append(line_set)
+
+    return free_lines
+
+
+def bot_turn(i, stack, color, difficult=1):
     # all possible turns list
     coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
     coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
+    coords_arr = [list(i) for i in set(tuple(j) for j in coords_arr)] if Configs.GRAVITY else coords_arr
     coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
 
     # check for win turns
     for coord in coords_arr:
         temp_stack = copy.deepcopy(stack)
         temp_stack[color].append(coord)
+
         if win_check_from_db(temp_stack, coord, color):
             print(f'{color} turn: {coord}')
             return coord
@@ -148,16 +168,37 @@ def easy_bot_turn(i, stack, color):
     for coord in coords_arr:
         temp_stack = copy.deepcopy(stack)
         temp_stack[enemy_color].append(coord)
+
         if win_check_from_db(temp_stack, coord, enemy_color):
             print(f'{color} turn: {coord}')
             return coord
 
+    if difficult == 1:
+        coords_arr = [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]
+    elif difficult == 2:  # find the most position attractive turns
+
+        count_of_perspectives = {}
+        for coord in coords_arr:
+            temp_lines = free_lines_counter(stack=stack, turn=coord, enemy_color=enemy_color)
+            count = len(temp_lines)
+
+            if count_of_perspectives.get(count) is not None:
+                count_of_perspectives[count].append(coord)
+            else:
+                count_of_perspectives[count] = []
+
+        coords_arr_new = []
+        for j in np.sort([*count_of_perspectives.keys()])[::-1]:
+            coords_arr_new += count_of_perspectives[j]
+        coords_arr = coords_arr_new
+
     # check for not turning under loose
-    for coord in [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]:
+    for coord in coords_arr:
         temp_stack = copy.deepcopy(stack)
         temp_coord = copy.deepcopy(coord)
         temp_coord[-1] += 1
         temp_stack[enemy_color].append(temp_coord)
+
         if not win_check_from_db(temp_stack, temp_coord, enemy_color):
             print(f'{color} turn: {coord}')
             return coord
