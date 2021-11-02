@@ -7,12 +7,12 @@ from funcs import init_field, input_coords, render_turn, gravity_correction, lin
 
 
 Configs.debug_mod = False  # random turns by pc without players decisions
+Configs.second_bot = 1      # 0, 1, 2 - difficult of second bot
 
 Configs.GRAVITY = True
 Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 Configs.play_vs_bot = 1  # 0, 1, 2 - the presence and number of the bot's move
-Configs.second_bot = True
 Configs.bot_difficult = 2
 
 
@@ -33,13 +33,13 @@ def single_game(rendering=True, range_func=trange):
         # turns logic
         if (i % 2 + 1) == Configs.play_vs_bot:
             turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.bot_difficult)
+            print(f'{color} turn: {turn}') if rendering else 0
         else:
             if Configs.debug_mod:
-                if Configs.second_bot:
-                    turn = bot_turn(i=i, stack=stack, color=color, difficult=1)
-                    input() if rendering else 0
-                else:
-                    turn = debug_turn(i=i, stack=stack, color=color)
+                turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.second_bot)
+                if rendering:
+                    input()
+                    print(f'{color} turn: {turn}')
             else:
                 turn = input_coords(i=i, stack=stack, color=color)
 

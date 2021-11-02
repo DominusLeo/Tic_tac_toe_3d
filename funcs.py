@@ -82,10 +82,6 @@ def win_check_from_db(stack, coords, color):
     return False
 
 
-def bot_first_level():
-    return
-
-
 def input_coords(i, stack: dict, color):
     input_data = input(f"{color} player {i % 2 + 1}\nprint your coords: ")
 
@@ -120,15 +116,6 @@ def input_coords(i, stack: dict, color):
     return coords
 
 
-def debug_turn(i, stack, color):
-    coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
-    if coords in itertools.chain(*stack.values()):
-        return debug_turn(i, stack, color)
-    else:
-        print(f'{color} turn: {coords}')
-        return coords
-
-
 def free_lines_counter(stack, turn, enemy_color):
     free_lines = []
 
@@ -154,13 +141,16 @@ def bot_turn(i, stack, color, difficult=1):
     coords_arr = [list(i) for i in set(tuple(j) for j in coords_arr)] if Configs.GRAVITY else coords_arr
     coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
 
+    if difficult == 0:
+        coord = coords_arr[np.random.choice(range(len(coords_arr)))]
+        return coord
+
     # check for win turns
     for coord in coords_arr:
         temp_stack = copy.deepcopy(stack)
         temp_stack[color].append(coord)
 
         if win_check_from_db(temp_stack, coord, color):
-            print(f'{color} turn: {coord}')
             return coord
 
     # check for loosing turns
@@ -170,13 +160,12 @@ def bot_turn(i, stack, color, difficult=1):
         temp_stack[enemy_color].append(coord)
 
         if win_check_from_db(temp_stack, coord, enemy_color):
-            print(f'{color} turn: {coord}')
             return coord
 
-    if difficult == 1:
+    if difficult >= 1:
         coords_arr = [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]
-    elif difficult == 2:  # find the most position attractive turns
 
+    if difficult >= 2:  # find the most position attractive turns
         count_of_perspectives = {}
         for coord in coords_arr:
             temp_lines = free_lines_counter(stack=stack, turn=coord, enemy_color=enemy_color)
@@ -200,10 +189,8 @@ def bot_turn(i, stack, color, difficult=1):
         temp_stack[enemy_color].append(temp_coord)
 
         if not win_check_from_db(temp_stack, temp_coord, enemy_color):
-            print(f'{color} turn: {coord}')
             return coord
 
-    print(f'{color} turn: {coord}')
     return coord
 
 
@@ -224,6 +211,15 @@ def line_render(stack_render):
 
 
 # # scratches___________________________________________________________________________________________________________
+def debug_turn(i, stack, color):
+    coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))
+    if coords in itertools.chain(*stack.values()):
+        return debug_turn(i, stack, color)
+    else:
+        print(f'{color} turn: {coords}')
+        return coords
+
+
 # @njit(cache=True, nogil=True, fastmath=True)
 # def _win_check(st, cl, sh, cmbs):
 #     for line in cmbs:

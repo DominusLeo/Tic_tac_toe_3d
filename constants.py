@@ -8,7 +8,7 @@ class Configs:
     SHAPE = 4          # must be in range(3, 10) (WA)
     play_vs_bot = 0    # 0, 1, 2 - the presence and number of the bot's move
     bot_difficult = 1
-    second_bot = True
+    second_bot = 0     # 0, 1, 2 - difficult of second bot
 
     stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 
