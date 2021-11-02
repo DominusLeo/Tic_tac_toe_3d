@@ -11,6 +11,6 @@ to start game print in terminal in Tic_tac_toe_3D directory:
     
 instructions:
 set the turn - print (x, y, z) coordinates in format "123" (xyz)
-to exit the game - print "exit"
+to exit the game - print "ex"
 to cancel last two turns (opponent and yours) - print "c"
 look for hints in terminal

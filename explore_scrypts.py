@@ -13,7 +13,8 @@ Configs.debug_mod = True  # random turns by pc without players decisions
 Configs.GRAVITY = True
 Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
-Configs.play_vs_bot = 0  # 0, 1, 2 - the presence and number of the bot's move
+Configs.play_vs_bot = 2  # 0, 1, 2 - the presence and number of the bot's move
+Configs.second_bot = False
 
 
 if __name__ == "__main__":

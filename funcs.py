@@ -96,7 +96,7 @@ def input_coords(i, stack: dict, color):
 
     try:
         # exit condition
-        if input_data == "exit":
+        if input_data == "ex":
             return "exit"
 
         # rollback turn condition
@@ -130,43 +130,40 @@ def debug_turn(i, stack, color):
 
 
 def easy_bot_turn(i, stack, color):
-    cond = (i + Configs.play_vs_bot) % 2
+    # all possible turns list
+    coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
+    coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
+    coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
 
-    if cond:
-        # all possible turns list
-        coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
-        coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
-        coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+    # check for win turns
+    for coord in coords_arr:
+        temp_stack = copy.deepcopy(stack)
+        temp_stack[color].append(coord)
+        if win_check_from_db(temp_stack, coord, color):
+            print(f'{color} turn: {coord}')
+            return coord
 
-        # check for win turns
-        for coord in coords_arr:
-            temp_stack = copy.deepcopy(stack)
-            temp_stack[color].append(coord)
-            if win_check_from_db(temp_stack, coord, color):
-                print(f'{color} turn: {coord}')
-                return coord
+    # check for loosing turns
+    enemy_color = list(stack.keys())[(i + 1) % 2]
+    for coord in coords_arr:
+        temp_stack = copy.deepcopy(stack)
+        temp_stack[enemy_color].append(coord)
+        if win_check_from_db(temp_stack, coord, enemy_color):
+            print(f'{color} turn: {coord}')
+            return coord
 
-        # check for loosing turns
-        enemy_color = list(stack.keys())[(i + 1) % 2]
-        for coord in coords_arr:
-            temp_stack = copy.deepcopy(stack)
-            temp_stack[enemy_color].append(coord)
-            if win_check_from_db(temp_stack, coord, enemy_color):
-                print(f'{color} turn: {coord}')
-                return coord
+    # check for not turning under loose
+    for coord in [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]:
+        temp_stack = copy.deepcopy(stack)
+        temp_coord = copy.deepcopy(coord)
+        temp_coord[-1] += 1
+        temp_stack[enemy_color].append(temp_coord)
+        if not win_check_from_db(temp_stack, temp_coord, enemy_color):
+            print(f'{color} turn: {coord}')
+            return coord
 
-        # check for not turning under loose
-        for coord in [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]:
-            temp_stack = copy.deepcopy(stack)
-            temp_coord = copy.deepcopy(coord)
-            temp_coord[-1] += 1
-            temp_stack[enemy_color].append(temp_coord)
-            if not win_check_from_db(temp_stack, temp_coord, enemy_color):
-                print(f'{color} turn: {coord}')
-                return coord
-
-        print(f'{color} turn: {coord}')
-        return coord
+    print(f'{color} turn: {coord}')
+    return coord
 
 
 def render_turn(ax, fig, turn, color):
@@ -182,7 +179,7 @@ def line_render(stack_render):
         for i in stack_render[color]:
             ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.7, edgecolors='black')
     fig.show()
-    return ax, fig
+    return fig, ax
 
 
 # # scratches___________________________________________________________________________________________________________
