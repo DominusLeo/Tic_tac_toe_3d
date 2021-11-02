@@ -6,12 +6,13 @@ from funcs import init_field, input_coords, render_turn, gravity_correction, lin
     bot_turn, debug_turn
 
 
-Configs.debug_mod = False  # random turns by pc without players decisions
-Configs.second_bot = 1      # 0, 1, 2 - difficult of second bot
-
 Configs.GRAVITY = True
 Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
+
+Configs.debug_mod = False  # random turns by pc without players decisions
+Configs.second_bot = 1      # 0, 1, 2 - difficult of second bot
+
 Configs.play_vs_bot = 1  # 0, 1, 2 - the presence and number of the bot's move
 Configs.bot_difficult = 2
 

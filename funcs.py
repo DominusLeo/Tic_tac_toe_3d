@@ -119,7 +119,7 @@ def input_coords(i, stack: dict, color):
 def free_lines_counter(stack, turn, enemy_color):
     free_lines = []
 
-    possible_lines = [t for t in dict_of_shapes_wins[Configs.SHAPE] if tuple(turn) in t]
+    possible_lines = [t for t in dict_of_shapes_wins[Configs.SHAPE] if turn in t]
 
     for line_set in possible_lines:
         flag = True
@@ -166,19 +166,29 @@ def bot_turn(i, stack, color, difficult=1):
         coords_arr = [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]
 
     if difficult >= 2:  # find the most position attractive turns
-        count_of_perspectives = {}
+        count_of_lines = {}
         for coord in coords_arr:
-            temp_lines = free_lines_counter(stack=stack, turn=coord, enemy_color=enemy_color)
+            temp_coord = tuple(coord)
+
+            temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
             count = len(temp_lines)
 
-            if count_of_perspectives.get(count) is not None:
-                count_of_perspectives[count].append(coord)
+            # enemy analyse
+            temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
+            count_enemy = len(temp_lines_enemy)
+
+            count_of_lines[temp_coord] = count + count_enemy
+
+        count_of_points = {}
+        for i in count_of_lines:
+            if count_of_points.get(count_of_lines[i]) is not None:
+                count_of_points[count_of_lines[i]].append(list(i))
             else:
-                count_of_perspectives[count] = []
+                count_of_points[count_of_lines[i]] = []
 
         coords_arr_new = []
-        for j in np.sort([*count_of_perspectives.keys()])[::-1]:
-            coords_arr_new += count_of_perspectives[j]
+        for j in np.sort([*count_of_points.keys()])[::-1]:
+            coords_arr_new += count_of_points[j]
         coords_arr = coords_arr_new
 
     # check for not turning under loose
