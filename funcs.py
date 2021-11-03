@@ -136,7 +136,7 @@ def bot_turn(i, stack, color, difficult=1):
     if difficult >= 1:
         coords_arr = [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]
 
-    if difficult >= 2:  # find the most position attractive turns
+    if difficult == 2:  # find the most position attractive turns
         count_of_lines = {}
         for coord in coords_arr:
             temp_coord = tuple(coord)
@@ -155,7 +155,39 @@ def bot_turn(i, stack, color, difficult=1):
             if count_of_points.get(count_of_lines[i]) is not None:
                 count_of_points[count_of_lines[i]].append(list(i))
             else:
-                count_of_points[count_of_lines[i]] = []
+                count_of_points[count_of_lines[i]] = [list(i)]
+
+        coords_arr_new = []
+        for j in np.sort([*count_of_points.keys()])[::-1]:
+            coords_arr_new += count_of_points[j]
+        coords_arr = coords_arr_new
+
+    if difficult >= 3:  # find the most position attractive turns
+        temp_lines_w = {}
+        for coord in coords_arr:
+            temp_coord = tuple(coord)
+
+            temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
+
+            weight_1 = 0
+            for line in temp_lines:
+                weight_1 += (len(set(tuple(i) for i in stack[color]) & line) + 1)
+
+            # enemy analyse
+            temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
+
+            weight_2 = 0
+            for line in temp_lines_enemy:
+                weight_2 += (len(set(tuple(i) for i in stack[enemy_color]) & line) + 1)
+
+            temp_lines_w[temp_coord] = weight_1 + weight_2
+
+        count_of_points = {}
+        for i in temp_lines_w:
+            if count_of_points.get(temp_lines_w[i]) is not None:
+                count_of_points[temp_lines_w[i]].append(list(i))
+            else:
+                count_of_points[temp_lines_w[i]] = [list(i)]
 
         coords_arr_new = []
         for j in np.sort([*count_of_points.keys()])[::-1]:

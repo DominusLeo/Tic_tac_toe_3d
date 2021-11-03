@@ -45,6 +45,37 @@ def free_lines_counter(stack, turn, enemy_color):
     return free_lines
 
 
+# direct_dict = [range(1, Configs.SHAPE + 1), range(1, Configs.SHAPE + 1), range(z, z + 1)]
+
+
+corners = [*set([*itertools.permutations([1, Configs.SHAPE, 1])] +
+                [*itertools.permutations([Configs.SHAPE, Configs.SHAPE, 1])] +
+                [(Configs.SHAPE, Configs.SHAPE, Configs.SHAPE)] + [(1, 1, 1)])]
+
+
+def all_lines_new():
+    all_direct_lines = []
+
+    for z in range(1, Configs.SHAPE + 1):
+        temp = [*itertools.product(range(1, Configs.SHAPE + 1), range(1, Configs.SHAPE + 1), range(z, z + 1))]
+        for line in tqdm(itertools.combinations(temp, Configs.SHAPE)):
+            if sympy.Point.is_collinear(*line):
+                all_direct_lines.append(frozenset(tuple(i) for i in line))
+
+    for y in range(1, Configs.SHAPE + 1):
+        temp = [*itertools.product(range(1, Configs.SHAPE + 1), range(y, y + 1), range(1, Configs.SHAPE + 1))]
+        for line in tqdm(itertools.combinations(temp, Configs.SHAPE)):
+            if sympy.Point.is_collinear(*line):
+                all_direct_lines.append(frozenset(tuple(i) for i in line))
+
+    for x in range(1, Configs.SHAPE + 1):
+        temp = [*itertools.product(range(x, x + 1), range(1, Configs.SHAPE + 1), range(1, Configs.SHAPE + 1))]
+        for line in tqdm(itertools.combinations(temp, Configs.SHAPE)):
+            if sympy.Point.is_collinear(*line):
+                all_direct_lines.append(frozenset(tuple(i) for i in line))
+    return
+
+
 # # scratches___________________________________________________________________________________________________________
 def debug_turn(i, stack, color):
     coords = list(np.random.randint(1, Configs.SHAPE + 1, DIMENSION))

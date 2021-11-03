@@ -11,10 +11,10 @@ Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 
 Configs.debug_mod = False  # random turns by pc without players decisions
-Configs.second_bot = 1      # 0, 1, 2 - difficult of second bot
+Configs.second_bot = 2      # 0, 1, 2 - difficult of second bot
 
 Configs.play_vs_bot = 1  # 0, 1, 2 - the presence and number of the bot's move
-Configs.bot_difficult = 2
+Configs.bot_difficult = 3
 
 
 def single_game(rendering=True, range_func=trange):
@@ -23,12 +23,20 @@ def single_game(rendering=True, range_func=trange):
 
     turn, cancels = 0, 0
 
-    for i in range_func(Configs.SHAPE ** DIMENSION + cancels):
-        # WA for multi canceling turns
-        if turn == "cancel":
-            turn = 0
-            continue
+    if rendering:
+        if not Configs.debug_mod:
+            if Configs.play_vs_bot == 1:
+                print(f"main_{Configs.bot_difficult}_lvl_bot VS player 2")
+            else:
+                print(f"player 1 VS main_{Configs.bot_difficult}_lvl_bot")
+        else:
+            if Configs.play_vs_bot == 1:
+                print(f"main_{Configs.bot_difficult}_lvl_bot VS debug_{Configs.second_bot}_lvl_bot")
+            else:
+                print(f"debug_{Configs.second_bot}_lvl_bot VS main_{Configs.bot_difficult}_lvl_bot")
 
+    i = 0
+    while i < Configs.SHAPE ** DIMENSION:
         color = list(stack.keys())[i % 2]
 
         # turns logic
@@ -46,7 +54,7 @@ def single_game(rendering=True, range_func=trange):
 
         # logic for canceling last turn
         if turn == "cancel":
-            cancels += 2
+            i -= 2
             stack[color].pop(-1)
             stack[list(stack.keys())[i % 2 - 1]].pop(-1)
 
@@ -62,14 +70,20 @@ def single_game(rendering=True, range_func=trange):
 
         is_win = win_check_from_db(stack=stack, coords=turn, color=color)
         # is_win = False
+        i += 1
+
         if is_win:
             print(f"{color} player win")
             line_render(stack_render={color: is_win}) if rendering else None
             break
 
-    if rendering and Configs.play_vs_bot and not Configs.debug_mod:
-        leader_bord_stat(i=i, your_turn=(i % 2 + 1), is_win=(i % 2 == Configs.play_vs_bot))
-    return color, i
+    if rendering:
+        if turn == "exit":
+            input()
+        elif Configs.play_vs_bot and not Configs.debug_mod:
+            input()
+        #     leader_bord_stat(i=i, your_turn=(i + 1) % 2 + 1, is_win=(i % 2 == (Configs.play_vs_bot % 2 + 1)))
+    return color, i, is_win
 
 
 if __name__ == "__main__":
