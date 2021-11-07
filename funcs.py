@@ -11,7 +11,7 @@ import datetime as dt
 # from matplotlib.widgets import TextBox
 # from numba import jit, cuda, njit
 
-from constants import Configs, DIMENSION, dict_of_shapes_wins
+from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl
 from utils import free_lines_counter
 
 
@@ -106,7 +106,7 @@ def input_coords(i, stack: dict, color):
     return coords
 
 
-def bot_turn(i, stack, color, difficult=1):
+def bot_turn(i, stack, color, difficult=1, configs=None):
     # all possible turns list
     coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
     coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
@@ -150,14 +150,16 @@ def bot_turn(i, stack, color, difficult=1):
                 weight_1 = len(temp_lines)
                 weight_2 = len(temp_lines_enemy)
 
-            elif difficult == 3:
+            elif difficult >= 3:
+                weights = Bot_3_lvl() if configs is None else configs
+
                 weight_1 = 0
                 for line in temp_lines:
-                    weight_1 += (len(set(tuple(i) for i in stack[color]) & line) + 1)
+                    weight_1 += weights.own_weights[len(set(tuple(i) for i in stack[color]) & line)]
 
                 weight_2 = 0
                 for line in temp_lines_enemy:
-                    weight_2 += (len(set(tuple(i) for i in stack[enemy_color]) & line) + 1)
+                    weight_2 += weights.enemy_weights[len(set(tuple(i) for i in stack[enemy_color]) & line)]
 
             count_of_lines[temp_coord] = weight_1 + weight_2
 

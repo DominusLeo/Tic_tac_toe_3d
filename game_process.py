@@ -17,7 +17,7 @@ Configs.play_vs_bot = 1  # 0, 1, 2 - the presence and number of the bot's move
 Configs.bot_difficult = 3
 
 
-def single_game(rendering=True, range_func=trange):
+def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None):
     fig, ax = init_field() if rendering else [None, None]
     stack = copy.deepcopy(Configs.stack)
 
@@ -41,11 +41,11 @@ def single_game(rendering=True, range_func=trange):
 
         # turns logic
         if (i % 2 + 1) == Configs.play_vs_bot:
-            turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.bot_difficult)
+            turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.bot_difficult, configs=bot_1_configs)
             print(f'{color} turn: {turn}') if rendering else 0
         else:
             if Configs.debug_mod:
-                turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.second_bot)
+                turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.second_bot, configs=bot_2_configs)
                 if rendering:
                     input()
                     print(f'{color} turn: {turn}')

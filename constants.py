@@ -13,6 +13,15 @@ class Configs:
     stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 
 
+class Bot_3_lvl:
+    def __init__(self):
+        self.own_weights = {i: i + 1 for i in range(Configs.SHAPE - 1)}
+        # self.own_weights[Configs.SHAPE - 1] = 2e6
+
+        self.enemy_weights = {i: i + 1 for i in range(Configs.SHAPE - 1)}
+        # self.enemy_weights[Configs.SHAPE - 1] = 1e6
+
+
 dict_of_shapes_wins = {i: [] for i in range(2, 10)}
 
 # TODO: [11.10.2021 by Lev] WA, need to remake
