@@ -75,14 +75,14 @@ def single_game(rendering=True, range_func=trange):
         if is_win:
             print(f"{color} player win")
             line_render(stack_render={color: is_win}) if rendering else None
+            i -= 1
             break
 
     if rendering:
         if turn == "exit":
             input()
         elif Configs.play_vs_bot and not Configs.debug_mod:
-            input()
-        #     leader_bord_stat(i=i, your_turn=(i + 1) % 2 + 1, is_win=(i % 2 == (Configs.play_vs_bot % 2 + 1)))
+            leader_bord_stat(i=i, your_turn=(i % 2 + 1), is_win=((i % 2 + 1) == (Configs.play_vs_bot % 2 + 1)))
     return color, i, is_win
 
 

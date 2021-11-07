@@ -32,17 +32,18 @@ def init_field():
     ax.set_ylabel('y axis', fontsize=10, rotation=1)
     ax.set_zlabel('z axis', fontsize=10, rotation=1)
 
+    # render verticals
     for x in range(1, Configs.SHAPE + 1):
         for y in range(1, Configs.SHAPE + 1):
             ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE, 100), ys=np.linspace(y, y, 100),
-                    c="grey", linewidth=5, alpha=0.8)
+                    c="grey", linewidth=10, alpha=0.9)
 
     ax.set_title(f"Tic Tac Toe 3d") if Configs.GRAVITY else ax.set_title(f"Levitating Tic Tac Toe 3d")
     # ax.legend()
 
-    # WA for good scaling
-    ax.scatter3D(0, 0, 1, s=1, c="w")
-    ax.scatter3D(Configs.SHAPE + 1, Configs.SHAPE + 1, Configs.SHAPE, s=1, c="w")
+    # # WA for good scaling
+    ax.scatter3D(0.8, 0.8, 1, s=1, c="w", alpha=0)
+    ax.scatter3D(Configs.SHAPE + 0.2, Configs.SHAPE + 0.2, Configs.SHAPE, s=1, c="w", alpha=0)
     fig.show()
 
     return fig, ax
@@ -136,19 +137,29 @@ def bot_turn(i, stack, color, difficult=1):
     if difficult >= 1:
         coords_arr = [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]
 
-    if difficult == 2:  # find the most position attractive turns
+    if difficult >= 2:  # find the most position attractive turns
         count_of_lines = {}
         for coord in coords_arr:
             temp_coord = tuple(coord)
 
             temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
-            count = len(temp_lines)
-
             # enemy analyse
             temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
-            count_enemy = len(temp_lines_enemy)
 
-            count_of_lines[temp_coord] = count + count_enemy
+            if difficult == 2:
+                weight_1 = len(temp_lines)
+                weight_2 = len(temp_lines_enemy)
+
+            elif difficult == 3:
+                weight_1 = 0
+                for line in temp_lines:
+                    weight_1 += (len(set(tuple(i) for i in stack[color]) & line) + 1)
+
+                weight_2 = 0
+                for line in temp_lines_enemy:
+                    weight_2 += (len(set(tuple(i) for i in stack[enemy_color]) & line) + 1)
+
+            count_of_lines[temp_coord] = weight_1 + weight_2
 
         count_of_points = {}
         for i in count_of_lines:
@@ -156,38 +167,6 @@ def bot_turn(i, stack, color, difficult=1):
                 count_of_points[count_of_lines[i]].append(list(i))
             else:
                 count_of_points[count_of_lines[i]] = [list(i)]
-
-        coords_arr_new = []
-        for j in np.sort([*count_of_points.keys()])[::-1]:
-            coords_arr_new += count_of_points[j]
-        coords_arr = coords_arr_new
-
-    if difficult >= 3:  # find the most position attractive turns
-        temp_lines_w = {}
-        for coord in coords_arr:
-            temp_coord = tuple(coord)
-
-            temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
-
-            weight_1 = 0
-            for line in temp_lines:
-                weight_1 += (len(set(tuple(i) for i in stack[color]) & line) + 1)
-
-            # enemy analyse
-            temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
-
-            weight_2 = 0
-            for line in temp_lines_enemy:
-                weight_2 += (len(set(tuple(i) for i in stack[enemy_color]) & line) + 1)
-
-            temp_lines_w[temp_coord] = weight_1 + weight_2
-
-        count_of_points = {}
-        for i in temp_lines_w:
-            if count_of_points.get(temp_lines_w[i]) is not None:
-                count_of_points[temp_lines_w[i]].append(list(i))
-            else:
-                count_of_points[temp_lines_w[i]] = [list(i)]
 
         coords_arr_new = []
         for j in np.sort([*count_of_points.keys()])[::-1]:
@@ -208,7 +187,7 @@ def bot_turn(i, stack, color, difficult=1):
 
 
 def render_turn(ax, fig, turn, color):
-    ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.7, edgecolors='black')
+    ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.8, edgecolors='black')
     fig.show()
 
 
@@ -217,12 +196,13 @@ def line_render(stack_render):
 
     for color in stack_render:
         for i in stack_render[color]:
-            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.7, edgecolors='black')
+            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.8, edgecolors='black')
     fig.show()
     return fig, ax
 
 
 def leader_bord_stat(i, your_turn, is_win):
+    your_turn = your_turn if is_win else (your_turn % 2 + 1)
     leader_name = input('print yor name:\n') or "Leo"
     type_game = 'x'.join(map(str, [Configs.SHAPE] * DIMENSION))
     type_game = type_game if Configs.GRAVITY else type_game + "_levitate"
