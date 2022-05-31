@@ -2,16 +2,18 @@ import copy
 import time
 import sympy
 import numpy as np
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import itertools
 import pandas as pd
 import seaborn as sns
+from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import datetime as dt
 # from matplotlib.widgets import TextBox
 # from numba import jit, cuda, njit
 
-from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl
+from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha
 from utils import free_lines_counter
 
 
@@ -20,7 +22,21 @@ pd.set_option('display.width', 1000)
 sns.set(style='darkgrid')
 
 
+def size_coef(coord, cf=0.5):
+    fix_coord = coord.copy()
+    # [4,1,4] - max()
+    # [1,4,1] - min()
+    fix_coord[1] = Configs.SHAPE - coord[1] + 1
+
+    res = np.product(fix_coord)
+    max_coord = Configs.SHAPE ** 3
+    return (res / max_coord + cf) / (1 + cf), (1 - res / max_coord + cf) / (1 + cf)
+
+
 def init_field():
+    # mpl.use('TkAgg')
+    plt.style.use('bmh')
+
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
@@ -35,16 +51,26 @@ def init_field():
     # render verticals
     for x in range(1, Configs.SHAPE + 1):
         for y in range(1, Configs.SHAPE + 1):
+            c_s, c_a = size_coef([x, y, 4], cf=0.9)
             ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE, 100), ys=np.linspace(y, y, 100),
-                    c="grey", linewidth=10, alpha=0.9)
+                    c="grey", linewidth=10 * c_s, alpha=turns_alpha * c_s)
 
     ax.set_title(f"Tic Tac Toe 3d") if Configs.GRAVITY else ax.set_title(f"Levitating Tic Tac Toe 3d")
-    # ax.legend()
+    ax.set_zlim([1, 4.2])
 
-    # # WA for good scaling
-    ax.scatter3D(0.8, 0.8, 1, s=1, c="w", alpha=0)
-    ax.scatter3D(Configs.SHAPE + 0.2, Configs.SHAPE + 0.2, Configs.SHAPE, s=1, c="w", alpha=0)
-    fig.show()
+    x_scale = 4
+    y_scale = 4
+    z_scale = 2
+
+    scale = np.diag([x_scale, y_scale, z_scale, 1.0])
+    scale = scale * (1.0 / scale.max())
+    scale[3, 3] = 1.0
+
+    def short_proj():
+        return np.dot(Axes3D.get_proj(ax), scale)
+
+    ax.get_proj = short_proj
+    # ax.legend()
 
     return fig, ax
 
@@ -189,7 +215,9 @@ def bot_turn(i, stack, color, difficult=1, configs=None):
 
 
 def render_turn(ax, fig, turn, color):
-    ax.scatter(*turn, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.8, edgecolors='black')
+    coef_s, coef_a = size_coef(turn)
+    ax.scatter(*turn, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, alpha=turns_alpha * coef_s,
+               edgecolors='black')
     fig.show()
 
 
@@ -198,7 +226,9 @@ def line_render(stack_render):
 
     for color in stack_render:
         for i in stack_render[color]:
-            ax.scatter(*i, s=2000, c=color, marker='h', linewidths=1, norm=True, alpha=0.8, edgecolors='black')
+            coef_s, coef_a  = size_coef(i)
+            ax.scatter(*i, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True,
+                       alpha=turns_alpha * coef_s, edgecolors='black')
     fig.show()
     return fig, ax
 

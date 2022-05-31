@@ -6,7 +6,7 @@ from funcs import init_field, input_coords, render_turn, gravity_correction, lin
     leader_bord_stat
 
 
-Configs.GRAVITY = True
+Configs.GRAVITY = False
 Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 Configs.stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 
@@ -55,8 +55,9 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None):
         # logic for canceling last turn
         if turn == "cancel":
             i -= 2
-            stack[color].pop(-1)
-            stack[list(stack.keys())[i % 2 - 1]].pop(-1)
+            if i >= 0:
+                stack[color].pop(-1)
+                stack[list(stack.keys())[i % 2 - 1]].pop(-1)
 
             fig, ax = line_render(stack_render=stack)
             continue

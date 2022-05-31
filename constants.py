@@ -1,4 +1,5 @@
 DIMENSION = 3
+turns_alpha = 0.9
 
 
 class Configs:
