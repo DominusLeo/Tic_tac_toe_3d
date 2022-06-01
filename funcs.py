@@ -71,8 +71,16 @@ def init_field():
 
     ax.get_proj = short_proj
     # ax.legend()
+    fig.show()
 
     return fig, ax
+
+
+def render_turn(ax, fig, turn, color):
+    coef_s, coef_a = size_coef(turn)
+    ax.scatter(*turn, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, alpha=turns_alpha * coef_s,
+               edgecolors='black')
+    fig.show()
 
 
 def gravity_correction(coords, stack):
@@ -212,13 +220,6 @@ def bot_turn(i, stack, color, difficult=1, configs=None):
             return coord
 
     return coord
-
-
-def render_turn(ax, fig, turn, color):
-    coef_s, coef_a = size_coef(turn)
-    ax.scatter(*turn, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, alpha=turns_alpha * coef_s,
-               edgecolors='black')
-    fig.show()
 
 
 def line_render(stack_render):

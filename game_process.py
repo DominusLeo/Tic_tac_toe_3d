@@ -41,31 +41,34 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None):
 
         # turns logic
         if (i % 2 + 1) == Configs.play_vs_bot:
-            turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.bot_difficult, configs=bot_1_configs)
-            print(f'{color} turn: {turn}') if rendering else 0
+            if turn != 'cancel':
+                turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.bot_difficult, configs=bot_1_configs)
+                print(f'{color} turn: {turn}') if rendering else 0
         else:
             if Configs.debug_mod:
-                turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.second_bot, configs=bot_2_configs)
+                if turn != 'cancel':
+                    turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.second_bot, configs=bot_2_configs)
                 if rendering:
                     input()
                     print(f'{color} turn: {turn}')
             else:
                 turn = input_coords(i=i, stack=stack, color=color)
 
+        turn = gravity_correction(coords=turn, stack=stack)
+        stack[color].append(turn)
+
         # logic for canceling last turn
         if turn == "cancel":
-            i -= 2
+            i -= 1
             if i >= 0:
+                stack[list(stack.keys())[i % 2]].pop(-1)
                 stack[color].pop(-1)
-                stack[list(stack.keys())[i % 2 - 1]].pop(-1)
-
-            fig, ax = line_render(stack_render=stack)
+                ax.collections[-1].remove()
+                fig.show()
+            # fig, ax = line_render(stack_render=stack)
             continue
 
         if turn == "exit": break  # WA for exit
-
-        turn = gravity_correction(coords=turn, stack=stack)
-        stack[color].append(turn)
 
         render_turn(ax=ax, fig=fig, turn=turn, color=color) if rendering else None
 
