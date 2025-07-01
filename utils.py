@@ -11,6 +11,25 @@ import matplotlib.pyplot as plt
 from constants import Configs, DIMENSION, dict_of_shapes_wins
 
 
+def gravity_correction(coords, stack):
+    if Configs.GRAVITY:
+        if coords[-1] == 1:
+            return coords
+        else:
+            temp = coords.copy()
+            temp[-1] = temp[-1] - 1
+            if temp in itertools.chain(*stack.values()):
+                return coords
+            else:
+                return gravity_correction(temp, stack)
+    else:
+        return coords
+
+
+def under_points(coord):
+    return [(coord[0], coord[1], coord[2] - i) for i in range(1, coord[2])]
+
+
 def fill_all_field():
     stack = {'red': [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]}
     return stack

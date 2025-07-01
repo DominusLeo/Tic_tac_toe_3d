@@ -1,4 +1,7 @@
 import copy
+import json
+import os
+import pickle
 import time
 import sympy
 import numpy as np
@@ -10,11 +13,14 @@ import seaborn as sns
 from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import datetime as dt
+
+from bot_utils import filter_lines_stack, filter_weight_calc, filter_cross_forks_stack, filter_over_forks_stack, \
+    find_dead_points
+from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha, Bot_4_lvl, need_size_cf
+from utils import free_lines_counter, gravity_correction
+
 # from matplotlib.widgets import TextBox
 # from numba import jit, cuda, njit
-
-from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha
-from utils import free_lines_counter
 
 
 pd.set_option('display.max_columns', None)
@@ -22,15 +28,54 @@ pd.set_option('display.width', 1000)
 sns.set(style='darkgrid')
 
 
-def size_coef(coord, cf=0.5):
-    fix_coord = coord.copy()
-    # [4,1,4] - max()
-    # [1,4,1] - min()
-    fix_coord[1] = Configs.SHAPE - coord[1] + 1
+def obj_saver(obj, path='./obj.pickle'):
+    parent = os.path.dirname(path)
 
-    res = np.product(fix_coord)
-    max_coord = Configs.SHAPE ** 3
-    return (res / max_coord + cf) / (1 + cf), (1 - res / max_coord + cf) / (1 + cf)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+
+    with open(path, 'wb') as file:
+        pickle.dump(obj, file, pickle.HIGHEST_PROTOCOL)
+    return path
+
+
+def obj_reader(path, check_exists=False):
+    if check_exists:
+        if not os.path.exists(path):
+            return None
+
+    with open(path, 'rb') as file:
+        res = pickle.load(file)
+    return res
+
+
+def json_saver(data, path):
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4, default=str)
+
+
+def json_reader(path, check_exists=False):
+    if check_exists:
+        if not os.path.exists(path):
+            return None
+
+    with open(path, 'r', encoding="utf8") as f:
+        res = json.load(f)
+    return res
+
+
+def size_coef(coord, cf=0.5, need_fix=need_size_cf,):
+    if need_size_cf:
+        fix_coord = coord.copy()
+        # [4,1,4] - max()
+        # [1,4,1] - min()
+        fix_coord[1] = Configs.SHAPE - coord[1] + 1
+
+        res = np.product(fix_coord)
+        max_coord = Configs.SHAPE ** 3
+        return (res / max_coord + cf) / (1 + cf), (1 - res / max_coord + cf) / (1 + cf)
+    else:
+        return 1, 1
 
 
 def init_field():
@@ -83,21 +128,6 @@ def render_turn(ax, fig, turn, color):
     fig.show()
 
 
-def gravity_correction(coords, stack):
-    if Configs.GRAVITY:
-        if coords[-1] == 1:
-            return coords
-        else:
-            temp = coords.copy()
-            temp[-1] = temp[-1] - 1
-            if temp in itertools.chain(*stack.values()):
-                return coords
-            else:
-                return gravity_correction(temp, stack)
-    else:
-        return coords
-
-
 def win_check_from_db(stack, coords, color):
     for line in itertools.combinations(stack[color], Configs.SHAPE):
         if coords in line:
@@ -140,12 +170,23 @@ def input_coords(i, stack: dict, color):
     return coords
 
 
-def bot_turn(i, stack, color, difficult=1, configs=None):
-    # all possible turns list
+def up_layer(stack):
     coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
     coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
     coords_arr = [list(i) for i in set(tuple(j) for j in coords_arr)] if Configs.GRAVITY else coords_arr
     coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+
+    return coords_arr
+
+
+def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
+    enemy_color = list(stack.keys())[(i + 1) % 2]
+
+    # all possible turns list
+    coords_arr = up_layer(stack)
+    field_data[color]['up_layer'] = set(tuple(ii) for ii in coords_arr)
+
+    count_of_points = {0: None}
 
     if difficult == 0:
         coord = coords_arr[np.random.choice(range(len(coords_arr)))]
@@ -160,76 +201,162 @@ def bot_turn(i, stack, color, difficult=1, configs=None):
             return coord
 
     # check for loosing turns
-    enemy_color = list(stack.keys())[(i + 1) % 2]
+    # where to move to close enemy line
     for coord in coords_arr:
         temp_stack = copy.deepcopy(stack)
         temp_stack[enemy_color].append(coord)
 
         if win_check_from_db(temp_stack, coord, enemy_color):
+            print('force move', end=' ')
             return coord
 
-    if difficult >= 1:
-        coords_arr = [coords_arr[i] for i in np.random.choice(range(len(coords_arr)), len(coords_arr), False)]
+    pos_turns = len(coords_arr)
+    # print(f"{pos_turns = }")
 
-    if difficult >= 2:  # find the most position attractive turns
-        count_of_lines = {}
-        for coord in coords_arr:
-            temp_coord = tuple(coord)
-
-            temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
-            # enemy analyse
-            temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
-
-            if difficult == 2:
-                weight_1 = len(temp_lines)
-                weight_2 = len(temp_lines_enemy)
-
-            elif difficult >= 3:
-                weights = Bot_3_lvl() if configs is None else configs
-
-                weight_1 = 0
-                for line in temp_lines:
-                    weight_1 += weights.own_weights[len(set(tuple(i) for i in stack[color]) & line)]
-
-                weight_2 = 0
-                for line in temp_lines_enemy:
-                    weight_2 += weights.enemy_weights[len(set(tuple(i) for i in stack[enemy_color]) & line)]
-
-            count_of_lines[temp_coord] = weight_1 + weight_2
-
-        count_of_points = {}
-        for i in count_of_lines:
-            if count_of_points.get(count_of_lines[i]) is not None:
-                count_of_points[count_of_lines[i]].append(list(i))
-            else:
-                count_of_points[count_of_lines[i]] = [list(i)]
-
-        coords_arr_new = []
-        for j in np.sort([*count_of_points.keys()])[::-1]:
-            coords_arr_new += count_of_points[j]
-        coords_arr = coords_arr_new
-
-    # check for not turning under loose
-    for coord in coords_arr:
+    # remove turns under loose (forbieden turns)
+    coords_arr_c = coords_arr.copy()
+    for coord in coords_arr_c:
         temp_stack = copy.deepcopy(stack)
         temp_coord = copy.deepcopy(coord)
         temp_coord[-1] += 1
         temp_stack[enemy_color].append(temp_coord)
 
-        if not win_check_from_db(temp_stack, temp_coord, enemy_color):
-            return coord
+        if win_check_from_db(temp_stack, temp_coord, enemy_color):
+            coords_arr.remove(coord)
+
+    # check for fork move:
+    for m, v in field_data[color]['dead_points'].items():
+        if v['fork_move'] and (v['fork_move'] & set([tuple(j) for j in coords_arr])):
+            print('fork move', end=' ')
+            return list(v['fork_move'])[-1]
+
+    if len(coords_arr) == 0:
+        print('no good turns found')
+        return coord
+
+    if difficult >= 1:
+        coords_arr = list(np.random.permutation(coords_arr))
+
+    if difficult < 4:
+        if difficult >= 2:  # find the most position attractive turns
+            count_of_lines = {}
+            for coord in coords_arr:
+                temp_coord = tuple(coord)
+
+                temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
+                # enemy analyse
+                temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
+
+                if 2 <= difficult <= 2.9:
+                    weight_1 = len(temp_lines)
+                    weight_2 = len(temp_lines_enemy)
+
+                elif 3 <= difficult <= 3.9:
+                    weights = Bot_3_lvl() if configs is None else configs
+
+                    weight_1 = 0
+                    for line in temp_lines:
+                        weight_1 += weights.own_weights[len(set(tuple(i) for i in stack[color]) & line)]
+
+                    weight_2 = 0
+                    for line in temp_lines_enemy:
+                        weight_2 += weights.enemy_weights[len(set(tuple(i) for i in stack[enemy_color]) & line)]
+
+                # max defense strat
+                our_cf = 1
+                enemy_cf = 1
+                if (difficult == 2.5) or (difficult == 3.5):
+                    our_cf = 1
+                    enemy_cf = 100
+
+                count_of_lines[temp_coord] = weight_1 * our_cf + weight_2 * enemy_cf
+
+
+            count_of_points = {}
+            for ii in count_of_lines:
+                if count_of_points.get(count_of_lines[ii]) is not None:
+                    count_of_points[count_of_lines[ii]].append(list(ii))
+                else:
+                    count_of_points[count_of_lines[ii]] = [list(ii)]
+
+            coords_arr_new = []
+            for j in np.sort([*count_of_points.keys()])[::-1]:
+                coords_arr_new += count_of_points[j]
+            coords_arr = coords_arr_new
+
+    if i >= 42:
+        ...
+
+    if difficult == 4:
+        field_data_variants = {tuple(coord): copy.deepcopy(field_data) for coord in coords_arr}  # TODO: [30.06.2025 by Leo] very slow
+        bot_weights = Bot_4_lvl()
+
+        for coord in (coords_arr):
+            coord = tuple(coord)
+            temp_field_data = field_data_variants[coord]
+            our_field = temp_field_data[color]
+            enemy_field = temp_field_data[enemy_color]
+
+            # filter lines left
+            our_field['lines_left'] = filter_lines_stack(our_field['lines_left'], coord, my_turn=True, stack=stack)
+            enemy_field['lines_left'] = filter_lines_stack(enemy_field['lines_left'], coord, my_turn=False, stack=stack)
+
+            # operations with dead points  # TODO: [21.06.2025 by Leo]
+            our_field['dead_points'], enemy_field['dead_points'] = find_dead_points(our_field['lines_left'], enemy_field['lines_left'], color=color,
+                                                                                    stack=stack, coord=coord, up_layer=field_data[color]['up_layer'],
+                                                                                    bot_weights=bot_weights, turn_num=i)
+
+            # find force moves combs
+            # our_field['force_moves'], enemy_field['force_moves'] =
+
+            # filter cross forks
+            our_field['cross_forks_left'] = filter_cross_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=True,
+                                                                     field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
+            enemy_field['cross_forks_left'] = filter_cross_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=False,
+                                                                       field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
+
+            # filter over forks
+            our_field['over_forks_left'] = filter_over_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=True,
+                                                                   field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
+            enemy_field['over_forks_left'] = filter_over_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=False,
+                                                                     field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
+
+            # field_data_variants[coord] = {color: our_field, enemy_color: enemy_field}
+
+        coords_weights = filter_weight_calc(field_data=field_data_variants, color=color, enemy_color=enemy_color,
+                                            bot_weights=bot_weights, stack=stack, turn_number=i)
+
+        coords_arr = list(dict(sorted(coords_weights.items(), key=lambda item: item[1], reverse=True)).keys())
+
+    coord = coords_arr[0]
+    # _________________________________________
 
     return coord
 
 
-def line_render(stack_render):
+def line_render(stack_render, label=None):
     fig, ax = init_field()
+
+    # Флаг для отслеживания первой точки каждого цвета
+    first_point_per_color = {}
 
     for color in stack_render:
         for i in stack_render[color]:
-            coef_s, coef_a  = size_coef(i)
+            coef_s, coef_a = size_coef([ii for ii in i])
+
+            # Устанавливаем label только для первой точки каждого цвета
+            point_label = None
+            if color not in first_point_per_color:
+                point_label = f"{label} ({color})" if label else color
+                first_point_per_color[color] = True
+
             ax.scatter(*i, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True,
-                       alpha=turns_alpha * coef_s, edgecolors='black')
+                       alpha=turns_alpha * coef_s, edgecolors='grey', label=point_label)
+
+    # Показываем легенду, если есть лейблы
+    if label is not None or len(stack_render) > 1:
+        ax.legend()
+
     fig.show()
     return fig, ax
 
