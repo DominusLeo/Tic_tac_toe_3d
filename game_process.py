@@ -1,25 +1,28 @@
 import copy
 from tqdm import trange
+import pickle
 
 from bot_utils import filter_lines_stack, filter_cross_forks_stack, filter_over_forks_stack, find_dead_points, \
-    bad_fork_logs, fork_logs, filter_weight_calc
+    bad_fork_logs, fork_logs, full_data_update, weight_calc
 from constants import Configs, DIMENSION, Bot_4_lvl
 from funcs import init_field, input_coords, render_turn, gravity_correction, line_render, win_check_from_db, bot_turn, \
     leader_bord_stat, obj_saver, json_saver, obj_reader, up_layer
 
 
 test_by_ready_game = False
-save_res = False
+to_save_res_name = False
 
 
 render = True
-game_log = obj_reader('test_data/test_game_log_n.pickle')
-game_log_save = []
+prev_game_log = obj_reader('test_data/test_game_log_n.pickle')
+game_log_to_save = []
 
 
 if __name__ == "__main__":
-    test_by_ready_game = True
-    save_res = 'test_data/test_game_log_n.pickle'
+    test_by_ready_game = False
+    start_turn_num = 96 if test_by_ready_game else 0
+
+    to_save_res_name = 'test_data/test_game_log_n.pickle'
 
     Configs.GRAVITY = True
     Configs.SHAPE = 4  # must be in range(3, 10) (WA)
@@ -34,16 +37,18 @@ if __name__ == "__main__":
     Configs.play_vs_bot = 2  # 0, 1, 2 - the presence and number of the bot's move
     Configs.bot_difficult = 4
 
-    Configs.debug_mod = True  # random turns by pc without players decisions
-    Configs.second_bot = 2     # 0, 1, 2 - difficult of second bot
+    Configs.debug_mod = False  # random turns by pc without players decisions
+    Configs.second_bot = 3     # 0, 1, 2 - difficult of second bot
 
 
-def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=Configs):
+def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=Configs, game_log_to_save=None):
     fig, ax = init_field() if rendering else [None, None]
     stack = copy.deepcopy(Configs.stack)
-    field_data = copy.deepcopy(Configs.field_data)
+    field_data = pickle.loads(pickle.dumps(Configs.field_data, -1))
 
     turn, cancels = 0, 0
+    if game_log_to_save is None:
+        game_log_to_save = []
 
     if rendering:
         if not Configs.debug_mod:
@@ -82,48 +87,34 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
             else:
                 turn = input_coords(i=i, stack=stack, color=color, )
 
-        if test_by_ready_game:
-            turn, turn_weight_test = list(game_log[i].items())[0]
+        if test_by_ready_game and (i <= start_turn_num):
+            turn, turn_weight_test = (prev_game_log[i])
 
         turn = gravity_correction(coords=list(turn), stack=stack)
 
         field_data[color]['up_layer'] = set([tuple(ii) for ii in up_layer(stack)])
         stack[color].append(turn)
 
-        field_data[color]['lines_left'] = filter_lines_stack(field_data[color]['lines_left'], tuple(turn), my_turn=True, stack=stack)
-        field_data[enemy_color]['lines_left'] = filter_lines_stack(field_data[enemy_color]['lines_left'], tuple(turn), my_turn=False, stack=stack)
+        full_data_update(field_data, tuple(turn), color, enemy_color, stack, turn_num=i)
 
-        # operations with dead points  # TODO: [21.06.2025 by Leo] ?
-        field_data[color]['dead_points'], field_data[enemy_color]['dead_points'] = \
-            find_dead_points(field_data[color]['lines_left'], field_data[enemy_color]['lines_left'], stack=stack, coord=turn,
-                             up_layer=field_data[color]['up_layer'], turn_num=i, color=color)
+        turn_weight = weight_calc(field_data, color, ) - weight_calc(field_data, enemy_color, )
+        # turn_weight = filter_weight_calc({tuple(turn): field_data}, color, enemy_color, stack=stack, turn_number=i)
 
-        if i >= 29:
+        if turn_weight >= 100000:
             ...
 
-        field_data[color]['cross_forks_left'] = filter_cross_forks_stack(tuple(turn), enemy_color=enemy_color, color=color,
-                                                                         my_turn=True, field_data=field_data, stack=stack)
-        field_data[enemy_color]['cross_forks_left'] = filter_cross_forks_stack(tuple(turn), enemy_color=enemy_color, color=color,
-                                                                               my_turn=False, field_data=field_data, stack=stack)
-
-        field_data[color]['over_forks_left'] = filter_over_forks_stack(tuple(turn), enemy_color=enemy_color, color=color,
-                                                                       my_turn=True, field_data=field_data, stack=stack)
-        field_data[enemy_color]['over_forks_left'] = filter_over_forks_stack(tuple(turn), enemy_color=enemy_color, color=color,
-                                                                             my_turn=False, field_data=field_data, stack=stack)
-
-        turn_weight = filter_weight_calc({tuple(turn): field_data}, color, enemy_color, stack=stack, turn_number=i)
-
-        if turn_weight[tuple(turn)] >= 100000:
+        if i >= 48:
             ...
 
-        print(turn_weight, '\n\n')
+        if rendering:
+            print(turn_weight, '\n\n')
 
         if test_by_ready_game:
-            print(f"{turn_weight[tuple(turn)]} == {turn_weight_test}")
-            if turn_weight[tuple(turn)] != turn_weight_test:
+            print(f"{turn_weight} == {turn_weight_test}")
+            if turn_weight != turn_weight_test:
                 print('error')
                 ...
-        game_log_save.append(turn_weight)
+        game_log_to_save.append((turn, turn_weight))
 
         # logic for canceling last turn
         if turn == "cancel":
@@ -148,16 +139,15 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
         #     print(field_data[enemy_color]['dead_points'])
         #     breakpoint()
 
-        if i == 40 and Configs.debug_mod:
-            ...
-            # breakpoint()
-        # is_win = False
         i += 1
 
         if is_win:
-            if save_res:
-                obj_saver(game_log_save, save_res)
+            if to_save_res_name:
+                obj_saver(game_log_to_save, to_save_res_name)
             print(f"{color} player win")
+            if ((Configs.play_vs_bot == 1) and color == 'black') \
+                    or ((Configs.play_vs_bot == 2) and color == 'white'):
+                ...
             line_render(stack_render={color: is_win}) if rendering else None
             i -= 1
             # breakpoint()
@@ -176,4 +166,4 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
 
 
 if __name__ == "__main__":
-    single_game(rendering=render)
+    single_game(rendering=render, game_log_to_save=None)

@@ -222,10 +222,10 @@ class Configs:
     field_data = {
         'fst_player': {
             'up_layer': set(),
-            'lines_left': {i: {'weight': 0, 'points': []} for i in deepcopy(dict_of_shapes_wins[SHAPE])},
-            'cross_forks_left': {i: {'weight': 0, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': []}
+            'lines_left': {i: {'weight': 1, 'points': []} for i in deepcopy(dict_of_shapes_wins[SHAPE])},
+            'cross_forks_left': {i: {'weight': 1, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': []}
                                  for i in deepcopy(dict_of_intersecting_lines_cross[SHAPE])},
-            'over_forks_left': {i: {'weight': 0, 'points': [], 'fork_points': get_fork_points(i)}
+            'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i)}
                                 for i in deepcopy(dict_of_adjacent_z_intersecting_lines_cross[SHAPE])}
 ,
             'force_moves': {},
@@ -233,10 +233,10 @@ class Configs:
         },
         "snd_player": {
             'up_layer': set(),
-            'lines_left': {i: {'weight': 0, 'points': []} for i in deepcopy(dict_of_shapes_wins[SHAPE])},
-            'cross_forks_left': {i: {'weight': 0, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': []}
+            'lines_left': {i: {'weight': 1, 'points': []} for i in deepcopy(dict_of_shapes_wins[SHAPE])},
+            'cross_forks_left': {i: {'weight': 1, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': []}
                                  for i in deepcopy(dict_of_intersecting_lines_cross[SHAPE])},
-            'over_forks_left': {i: {'weight': 0, 'points': [], 'fork_points': get_fork_points(i)}
+            'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i)}
                                 for i in deepcopy(dict_of_adjacent_z_intersecting_lines_cross[SHAPE])},
             'force_moves': {},
             'dead_points': {},
@@ -260,21 +260,22 @@ class Bot_4_lvl:
     def __init__(self):
         self.win_points = int(1e6)
 
-        self.line_weights = {i: i for i in range(Configs.SHAPE)}
+        self.line_weights = {i: i + 1 for i in range(Configs.SHAPE)}
         self.line_weights[Configs.SHAPE] = self.win_points
 
         self.fork_weights = {
-            0:0,
-            1:10,
-            2:20,
-            3:30,
-            4:40,
+            0:1,
+            1:2,
+            2:30,
+            3:40,
+            4:50,
         }
 
         # self.block_almost_line = (Configs.SHAPE - 1) * 2
 
-        self.common_3rd_dead_point = 40
-        self.own_3rd_dead_point = 80
+        self.odd_dead_points = 10000
+        self.common_3rd_dead_point = 50000 #400
+        self.own_3rd_dead_point = 100000 # 800
 
         # self.needed_count_3rd_dead_point = 8  # TODO: [21.06.2025 by Leo]
         

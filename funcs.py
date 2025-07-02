@@ -14,10 +14,10 @@ from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import datetime as dt
 
-from bot_utils import filter_lines_stack, filter_weight_calc, filter_cross_forks_stack, filter_over_forks_stack, \
-    find_dead_points
+from bot_utils import filter_lines_stack, filter_cross_forks_stack, filter_over_forks_stack, \
+    find_dead_points, full_data_update, weight_calc
 from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha, Bot_4_lvl, need_size_cf
-from utils import free_lines_counter, gravity_correction
+from utils import free_lines_counter, gravity_correction, debug_turn
 
 # from matplotlib.widgets import TextBox
 # from numba import jit, cuda, njit
@@ -207,7 +207,7 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
         temp_stack[enemy_color].append(coord)
 
         if win_check_from_db(temp_stack, coord, enemy_color):
-            print('force move', end=' ')
+            # print('force move', end=' ')  # TODO: [02.07.2025 by Leo] 
             return coord
 
     pos_turns = len(coords_arr)
@@ -288,45 +288,93 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
         ...
 
     if difficult == 4:
-        field_data_variants = {tuple(coord): copy.deepcopy(field_data) for coord in coords_arr}  # TODO: [30.06.2025 by Leo] very slow
+        field_data_variants = {tuple(coord): pickle.loads(pickle.dumps(field_data, -1)) for coord in coords_arr}  # TODO: [30.06.2025 by Leo] very slow
         bot_weights = Bot_4_lvl()
 
-        for coord in (coords_arr):
+        debug_weights = {}
+        coords_weights = {}
+        for coord in coords_arr:
             coord = tuple(coord)
             temp_field_data = field_data_variants[coord]
-            our_field = temp_field_data[color]
-            enemy_field = temp_field_data[enemy_color]
+            enemy_alt_data = pickle.loads(pickle.dumps(temp_field_data, -1))
 
-            # filter lines left
-            our_field['lines_left'] = filter_lines_stack(our_field['lines_left'], coord, my_turn=True, stack=stack)
-            enemy_field['lines_left'] = filter_lines_stack(enemy_field['lines_left'], coord, my_turn=False, stack=stack)
+            # weights before turn
+            start_our_weight = weight_calc(temp_field_data, color, )
+            start_enemy_weight = weight_calc(temp_field_data, enemy_color, )   # best comp for next up
 
-            # operations with dead points  # TODO: [21.06.2025 by Leo]
-            our_field['dead_points'], enemy_field['dead_points'] = find_dead_points(our_field['lines_left'], enemy_field['lines_left'], color=color,
-                                                                                    stack=stack, coord=coord, up_layer=field_data[color]['up_layer'],
-                                                                                    bot_weights=bot_weights, turn_num=i)
+            # weights for our turn now
+            full_data_update(temp_field_data, coord, color, enemy_color, stack, turn_num=i, bot_weights=bot_weights)
+            our_weight = weight_calc(temp_field_data, color, )
+            enemy_weight = weight_calc(temp_field_data, enemy_color, )
 
-            # find force moves combs
-            # our_field['force_moves'], enemy_field['force_moves'] =
+            # weights if enemy same turn
+            full_data_update(enemy_alt_data, coord, enemy_color, color, stack, turn_num=i + 1, bot_weights=bot_weights)
+            alt_our_weight = weight_calc(enemy_alt_data, color, )
+            alt_enemy_weight = weight_calc(enemy_alt_data, enemy_color, )  # cool fork pred
 
-            # filter cross forks
-            our_field['cross_forks_left'] = filter_cross_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=True,
-                                                                     field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
-            enemy_field['cross_forks_left'] = filter_cross_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=False,
-                                                                       field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
+            # weights after enemy up turn on our
+            over_coord = (coord[0], coord[1], coord[2] + 1) if coord[2] < Configs.SHAPE else None
+            if over_coord is not None:
+                full_data_update(temp_field_data, over_coord, enemy_color, color, stack, turn_num=i + 1, bot_weights=bot_weights)
+                our_future_weight = weight_calc(temp_field_data, color, )
+                enemy_future_weight = weight_calc(temp_field_data, enemy_color, )  # cool fork pred
+            else:
+                our_future_weight = start_our_weight
+                enemy_future_weight = start_enemy_weight
 
-            # filter over forks
-            our_field['over_forks_left'] = filter_over_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=True,
-                                                                   field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
-            enemy_field['over_forks_left'] = filter_over_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=False,
-                                                                     field_data=temp_field_data, stack=stack, bot_weights=bot_weights)
+            enemy_improv_for_fork_now = -(alt_enemy_weight - start_enemy_weight)  # when very good we need block it
+            enemy_improv_for_fork_up = (enemy_future_weight - start_enemy_weight)
 
-            # field_data_variants[coord] = {color: our_field, enemy_color: enemy_field}
+            our_improv_for_alt_enemy_turn = (alt_our_weight - start_our_weight)
+            our_improv_for_enemy_up_turn = (our_future_weight - start_our_weight)
 
-        coords_weights = filter_weight_calc(field_data=field_data_variants, color=color, enemy_color=enemy_color,
-                                            bot_weights=bot_weights, stack=stack, turn_number=i)
+            if (our_improv_for_alt_enemy_turn < -bot_weights.win_points // 10) or (our_improv_for_enemy_up_turn < -bot_weights.win_points // 10):
+                best_our_weight = our_weight - enemy_improv_for_fork_now - enemy_improv_for_fork_up + \
+                                  our_improv_for_alt_enemy_turn + our_improv_for_enemy_up_turn
+            else:
+                best_our_weight = our_weight - enemy_improv_for_fork_now - enemy_improv_for_fork_up
+
+            coords_weights[coord] = best_our_weight - enemy_weight# our_weight - enemy_weight
+
+            # debug_weights[coord] = {'was': {'our': start_our_weight, 'enemy': start_enemy_weight, },
+            #                          "now_we": {'our': our_weight, 'enemy': enemy_weight, },
+            #                          'alt_enemy': {'our': alt_our_weight, 'enemy': alt_enemy_weight, },
+            #                          "next_up_enemy": {'our': our_future_weight, 'enemy': enemy_future_weight, }}
+
+            # if any([start_our_weight > 1e5, start_enemy_weight > 1e5, our_weight > 1e5, enemy_weight > 1e5,
+            #     alt_our_weight > 1e5, alt_enemy_weight > 1e5, our_future_weight > 1e5, enemy_future_weight > 1e5]):
+            #     print(color, coord, debug_weights[coord])
+            #     ...
+
+        # if i >= 0:
+        #     next_min_was = []
+        #     next_min_now = []
+        #     next_min_alt = []
+        #     for ind, val in debug_weights.items():
+        #         if val['next_up_enemy']['enemy']:
+        #             nmw = val['next_up_enemy']['enemy'] - val['was']['enemy']  # best var
+        #             nmn = val['next_up_enemy']['enemy'] - val['now_we']['enemy']  # almost always >= 0
+        #             nma = val['next_up_enemy']['enemy'] - val['alt_enemy']['enemy']  # almost always <= 0
+        #
+        #             next_min_was.append(nmw)
+        #             next_min_now.append(nmn)
+        #             next_min_alt.append(nma)
+        #
+        #             # print(f"{val['next_up_enemy']['enemy']} - {val['was']['enemy']} = {nmw}")
+        #             # print(f"{val['next_up_enemy']['enemy']} - {val['now_we']['enemy']} = {nmn}")
+        #             # print(f"{val['next_up_enemy']['enemy']} - {val['alt_enemy']['enemy']} = {nmn}")
+        #             # print()
+        #     print(f'up - was {next_min_was}')
+        #     print(f'up - now {next_min_now}')
+        #     print(f'up - alt {next_min_alt}')
+
+        # coords_weights = filter_weight_calc(field_data_dct=field_data_variants, color=color, enemy_color=enemy_color,
+        #                                     stack=stack, turn_number=i)
 
         coords_arr = list(dict(sorted(coords_weights.items(), key=lambda item: item[1], reverse=True)).keys())
+
+    if i >= 46:
+        ...
 
     coord = coords_arr[0]
     # _________________________________________
