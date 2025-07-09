@@ -3,8 +3,6 @@ import time
 import sympy
 import numpy as np
 import itertools
-import csv
-import seaborn as sns
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 

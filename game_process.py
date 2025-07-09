@@ -2,11 +2,11 @@ import copy
 from tqdm import trange
 import pickle
 
-from bot_utils import filter_lines_stack, filter_cross_forks_stack, filter_over_forks_stack, find_dead_points, \
-    bad_fork_logs, fork_logs, full_data_update, weight_calc
+from bot_utils import bad_fork_logs, fork_logs, full_data_update, weight_calc
 from constants import Configs, DIMENSION, Bot_4_lvl
-from funcs import init_field, input_coords, render_turn, gravity_correction, line_render, win_check_from_db, bot_turn, \
-    leader_bord_stat, obj_saver, json_saver, obj_reader, up_layer
+from funcs import init_field, input_coords, render_turn, line_render, win_check_from_db, bot_turn, \
+    leader_bord_stat, obj_saver, obj_reader, up_layer, update_game_title
+from utils import gravity_correction
 
 
 test_by_ready_game = False
@@ -24,6 +24,10 @@ if __name__ == "__main__":
 
     to_save_res_name = 'test_data/test_game_log_n.pickle'
 
+    Configs.debug_mod = False  # random turns by pc without players decisions
+    Configs.second_bot = 3     # 0, 1, 2 - difficult of second bot
+    Configs.interactive_input = True  # True - интерактивный ввод, False - терминальный
+
     Configs.GRAVITY = True
     Configs.SHAPE = 4  # must be in range(3, 10) (WA)
 
@@ -36,9 +40,6 @@ if __name__ == "__main__":
 
     Configs.play_vs_bot = 2  # 0, 1, 2 - the presence and number of the bot's move
     Configs.bot_difficult = 4
-
-    Configs.debug_mod = False  # random turns by pc without players decisions
-    Configs.second_bot = 3     # 0, 1, 2 - difficult of second bot
 
 
 def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=Configs, game_log_to_save=None):
@@ -85,10 +86,21 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
                     # input()
                     print(f'{color} turn: {turn}')
             else:
-                turn = input_coords(i=i, stack=stack, color=color, )
+                # Обновляем заголовок перед ходом игрока
+                if rendering:
+                    update_game_title(ax, fig, color, i % 2 + 1)
+                
+                # Передаем fig и ax только если включен интерактивный режим
+                if Configs.interactive_input:
+                    turn = input_coords(i=i, stack=stack, color=color, fig=fig, ax=ax)
+                else:
+                    turn = input_coords(i=i, stack=stack, color=color)
 
-        if test_by_ready_game and (i <= start_turn_num):
-            turn, turn_weight_test = (prev_game_log[i])
+        if test_by_ready_game:
+            if (i <= start_turn_num) and i < len(prev_game_log):
+                turn, turn_weight_test = (prev_game_log[i])
+            else:
+                turn, turn_weight_test = turn, 0
 
         turn = gravity_correction(coords=list(turn), stack=stack)
 
@@ -129,7 +141,12 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
 
         if turn == "exit": break  # WA for exit
 
-        render_turn(ax=ax, fig=fig, turn=list(turn), color=color) if rendering else None
+        render_turn(ax=ax, fig=fig, turn=list(turn), color=color, ) if rendering else None  # label=f'{color}_{turn}'
+        
+        # Восстанавливаем обычный заголовок после хода
+        if rendering and not Configs.interactive_input:
+            update_game_title(ax, fig)
+        
         # print(f'give {turn_weight} points\n')
 
         is_win = win_check_from_db(stack=stack, coords=turn, color=color)

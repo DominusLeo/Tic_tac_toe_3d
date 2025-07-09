@@ -3,7 +3,6 @@ import json
 import os
 import pickle
 import time
-import sympy
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -14,8 +13,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import datetime as dt
 
-from bot_utils import filter_lines_stack, filter_cross_forks_stack, filter_over_forks_stack, \
-    find_dead_points, full_data_update, weight_calc
+from bot_utils import full_data_update, weight_calc, up_layer
 from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha, Bot_4_lvl, need_size_cf
 from utils import free_lines_counter, gravity_correction, debug_turn
 
@@ -79,7 +77,7 @@ def size_coef(coord, cf=0.5, need_fix=need_size_cf,):
 
 
 def init_field():
-    # mpl.use('TkAgg')
+    mpl.use('TkAgg')  # Включаем TkAgg backend для интерактивности
     plt.style.use('bmh')
 
     fig = plt.figure()
@@ -89,7 +87,7 @@ def init_field():
     ax.set_yticks(np.arange(1, Configs.SHAPE + 1, 1))
     ax.set_zticks(np.arange(1, Configs.SHAPE + 1, 1))
 
-    ax.set_xlabel('x axis', fontsize=10, rotation=1)
+    ax.set_xlabel('x axis', fontsize=10, rotation=1, loc='left')
     ax.set_ylabel('y axis', fontsize=10, rotation=1)
     ax.set_zlabel('z axis', fontsize=10, rotation=1)
 
@@ -100,8 +98,12 @@ def init_field():
             ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE, 100), ys=np.linspace(y, y, 100),
                     c="grey", linewidth=10 * c_s, alpha=turns_alpha * c_s)
 
-    ax.set_title(f"Tic Tac Toe 3d") if Configs.GRAVITY else ax.set_title(f"Levitating Tic Tac Toe 3d")
+    game_title = f"Tic Tac Toe 3d" if Configs.GRAVITY else f"Levitating Tic Tac Toe 3d"
+    ax.set_title(game_title)
     ax.set_zlim([1, 4.2])
+    
+    # # Инвертировать X-ось (справа налево)
+    # ax.invert_xaxis()
 
     x_scale = 4
     y_scale = 4
@@ -117,11 +119,29 @@ def init_field():
     ax.get_proj = short_proj
     # ax.legend()
     fig.show()
+    
+    # Принудительно активируем интерактивность
+    plt.ion()  # Включаем интерактивный режим
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
     return fig, ax
 
 
-def render_turn(ax, fig, turn, color):
+def update_game_title(ax, fig, current_player=None, player_num=None):
+    """Обновляет заголовок игры в зависимости от режима"""
+    game_title = f"Tic Tac Toe 3d" if Configs.GRAVITY else f"Levitating Tic Tac Toe 3d"
+    
+    # В обычном режиме (не интерактивном) показываем текущего игрока
+    if not Configs.interactive_input and current_player and player_num is not None:
+        game_title += f" - {current_player} player {player_num} turn"
+    
+    ax.set_title(game_title)
+    if fig:
+        fig.canvas.draw()
+
+
+def render_turn(ax, fig, turn, color, label=None):
     coef_s, coef_a = size_coef(turn)
     ax.scatter(*turn, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, alpha=turns_alpha * coef_s,
                edgecolors='black')
@@ -136,13 +156,173 @@ def win_check_from_db(stack, coords, color):
     return False
 
 
-def input_coords(i, stack: dict, color):
-    input_data = input(f"{color} player {i % 2 + 1}\nprint your coords: ")
+class InteractiveInput:
+    def __init__(self, fig, ax, stack, color, player_num):
+        self.fig = fig
+        self.ax = ax
+        self.stack = stack
+        self.color = color
+        self.player_num = player_num
+        self.coords = None
+        self.click_count = 0
+        self.temp_coords = [0, 0, 0]
+        self.preview_scatter = None
+        self.text_display = None
+        
+        # Обновляем заголовок
+        self.ax.set_title(f"{color} player {player_num} - Click to select coordinates (x, y, z)")
+        
+        # Подключаем только обработчик клавиш
+        self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
+        
+        # Добавляем текстовый дисплей для текущих координат
+        self.update_instruction_text()
+        
+    def update_instruction_text(self):
+        if self.click_count == 0:
+            instruction = f"Press key 1-{Configs.SHAPE} for X coordinate (Backspace to undo)"
+        elif self.click_count == 1:
+            instruction = f"X={self.temp_coords[0]}, Press key 1-{Configs.SHAPE} for Y coordinate (Backspace to undo)"
+        elif self.click_count == 2:
+            if self.temp_coords[2] == 0:
+                instruction = f"X={self.temp_coords[0]}, Y={self.temp_coords[1]}, Press key 1-{Configs.SHAPE} for Z coordinate (Backspace to undo)"
+            else:
+                instruction = f"X={self.temp_coords[0]}, Y={self.temp_coords[1]}, Z={self.temp_coords[2]} - Press ENTER to confirm (Backspace to undo)"
+        else:
+            instruction = f"Selected: {self.temp_coords}, Press ENTER to confirm or ESC to cancel"
+            
+        self.ax.set_title(f"{self.color} player {self.player_num} - {instruction}")
+        self.fig.canvas.draw()
 
-    # TODO: [06.10.2021 by Lev] replace terminal input into matplotlib box
-    # text_box = TextBox(ax, f"{color} player {i % 2 + 1}\nprint your coords: ")
-    # print(text_box.text)
-    # input_data = text_box.on_submit(print)
+
+    def on_key_press(self, event):
+        if event.key == 'enter' and self.click_count == 2 and all(coord > 0 for coord in self.temp_coords):
+            # Подтверждаем выбор только если все координаты введены
+            if self.is_valid_position():
+                self.coords = self.temp_coords.copy()
+                self.disconnect_events()
+                if self.preview_scatter:
+                    self.preview_scatter.remove()
+                # Восстанавливаем название игры
+                game_title = f"Tic Tac Toe 3d" if Configs.GRAVITY else f"Levitating Tic Tac Toe 3d"
+                self.ax.set_title(game_title)
+                self.fig.canvas.draw()
+            else:
+                print("Position already taken or invalid!")
+                self.reset_selection()
+            
+        elif event.key == 'escape':
+            self.reset_selection()
+            
+        elif event.key == 'c':
+            self.coords = "cancel"
+            self.disconnect_events()
+            
+        elif event.key == 'q':
+            self.coords = "exit"
+            self.disconnect_events()
+            
+        # Обработка цифровых клавиш для всех координат
+        elif event.key.isdigit():
+            coord_value = int(event.key)
+            if 1 <= coord_value <= Configs.SHAPE:
+                if self.click_count == 0:  # X coordinate
+                    self.temp_coords[0] = coord_value
+                    self.click_count = 1
+                elif self.click_count == 1:  # Y coordinate
+                    self.temp_coords[1] = coord_value
+                    self.click_count = 2
+                    self.temp_coords[2] = 1  # Default Z
+                elif self.click_count == 2:  # Z coordinate
+                    self.temp_coords[2] = coord_value
+                    # НЕ подтверждаем автоматически, ждем Enter
+                    # click_count остается 2, чтобы показать что нужен Enter
+                        
+                self.show_preview()
+                self.update_instruction_text()
+                
+        # Backspace для стирания последней координаты
+        elif event.key == 'backspace':
+            if self.click_count > 0:
+                self.click_count -= 1
+                if self.click_count == 0:
+                    self.temp_coords = [0, 0, 0]
+                elif self.click_count == 1:
+                    self.temp_coords[1] = 0
+                    self.temp_coords[2] = 0
+                elif self.click_count == 2:
+                    self.temp_coords[2] = 0
+                    
+                if self.preview_scatter:
+                    self.preview_scatter.remove()
+                    self.preview_scatter = None
+                    
+                self.show_preview()
+                self.update_instruction_text()
+                
+    def disconnect_events(self):
+        self.fig.canvas.mpl_disconnect('key_press_event')
+            
+    def reset_selection(self):
+        self.click_count = 0
+        self.temp_coords = [0, 0, 0]
+        self.coords = None
+        if self.preview_scatter:
+            self.preview_scatter.remove()
+            self.preview_scatter = None
+        self.update_instruction_text()
+        
+    def show_preview(self):
+        if self.preview_scatter:
+            self.preview_scatter.remove()
+            
+        if self.click_count >= 2 and self.temp_coords[2] > 0:
+            # Показываем предварительный просмотр позиции
+            coef_s, coef_a = size_coef(self.temp_coords)
+            self.preview_scatter = self.ax.scatter(*self.temp_coords, s=2000 * coef_s, 
+                                                 c=self.color, marker='h', linewidths=3,
+                                                 alpha=0.5, edgecolors='red')
+            self.fig.canvas.draw()
+            
+    def is_valid_position(self):
+        # Проверяем, не занята ли позиция
+        if self.temp_coords in itertools.chain(*self.stack.values()):
+            return False
+            
+        # Проверяем границы
+        if any(np.array(self.temp_coords) < 1) or any(np.array(self.temp_coords) > Configs.SHAPE):
+            return False
+            
+        # Проверяем размерность
+        if len(self.temp_coords) != DIMENSION:
+            return False
+            
+        return True
+        
+    def wait_for_input(self):
+        while self.coords is None:
+            self.fig.canvas.start_event_loop(timeout=0.1)
+        return self.coords
+
+
+def input_coords(i, stack: dict, color, fig=None, ax=None):
+    # Проверяем настройку интерактивного ввода
+    if Configs.interactive_input and fig is not None and ax is not None:
+        interactive_input = InteractiveInput(fig, ax, stack, color, i % 2 + 1)
+        coords = interactive_input.wait_for_input()
+        
+        if coords == "exit" or coords == "cancel":
+            return coords
+            
+        # Выводим в терминал куда походил игрок
+        print(f'{color} turn: {coords}')
+            
+        # Применяем гравитацию если нужно
+        coords = gravity_correction(coords=coords, stack=stack)
+        return coords
+    
+    # Fallback к текстовому вводу
+    input_data = input(f"{color} player {i % 2 + 1}\nprint your coords: ")
 
     try:
         # exit condition
@@ -158,25 +338,16 @@ def input_coords(i, stack: dict, color):
 
     except:  # TODO: [06.10.2021 by Lev] set right exception
         print("input is wrong\n")
-        coords = input_coords(i, stack, color)
+        coords = input_coords(i, stack, color, fig, ax)
 
     if (coords in itertools.chain(*stack.values())) \
             or any(np.array(coords) < 1) \
             or any(np.array(coords) > Configs.SHAPE) \
             or len(coords) != DIMENSION:
         print('this turn is impossible\n')
-        coords = input_coords(i, stack, color)
+        coords = input_coords(i, stack, color, fig, ax)
 
     return coords
-
-
-def up_layer(stack):
-    coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
-    coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
-    coords_arr = [list(i) for i in set(tuple(j) for j in coords_arr)] if Configs.GRAVITY else coords_arr
-    coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
-
-    return coords_arr
 
 
 def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):

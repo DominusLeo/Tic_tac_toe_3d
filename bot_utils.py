@@ -1,3 +1,4 @@
+import itertools
 import pickle
 
 from constants import *
@@ -11,7 +12,19 @@ fork_logs = {'cross_fork': {},
              'over_fork': {}}
 
 
-def filter_lines_stack(orig_lines_set, coord, my_turn=True, bot_weights=Bot_4_lvl(), stack=None):
+def up_layer(stack, return_tuple=False):
+    coords_arr = [list(coords) for coords in itertools.product(*[[*range(1, Configs.SHAPE + 1)]] * DIMENSION)]
+    coords_arr = [gravity_correction(coords, stack) for coords in coords_arr]
+    coords_arr = [list(i) for i in set(tuple(j) for j in coords_arr)] if Configs.GRAVITY else coords_arr
+    if return_tuple:
+        coords_arr = [tuple(coords) for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+    else:
+        coords_arr = [coords for coords in coords_arr if coords not in itertools.chain(*stack.values())]
+
+    return coords_arr
+
+
+def filter_lines_stack(orig_lines_set, coord, my_turn=True, bot_weights=Bot_4_lvl(), stack=None,):
     # new_lines_set =  deepcopy({k: deepcopy(v) for k, v in orig_lines_set.items()})
     new_lines_set = pickle.loads(pickle.dumps(orig_lines_set, -1))
 
@@ -287,7 +300,7 @@ def full_data_update(temp_field_data, coord, color, enemy_color, stack, turn_num
                                                              bot_weights=bot_weights)
     enemy_field['cross_forks_left'] = filter_cross_forks_stack(coord, enemy_color=enemy_color, color=color,
                                                                my_turn=False,
-                                                               field_data=temp_field_data, stack=stack,
+                                                               field_data=temp_field_data, stack=copy_stack,  # is copy_stack right?
                                                                bot_weights=bot_weights)
 
     # filter over forks

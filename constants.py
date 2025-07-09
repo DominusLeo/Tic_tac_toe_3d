@@ -216,6 +216,8 @@ class Configs:
     play_vs_bot = 0    # 0, 1, 2 - the presence and number of the bot's move
     bot_difficult = 1
     second_bot = 0     # 0, 1, 2 - difficult of second bot
+    
+    interactive_input = False  # True - интерактивный ввод через matplotlib, False - терминальный ввод
 
     stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 
@@ -228,8 +230,8 @@ class Configs:
             'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i)}
                                 for i in deepcopy(dict_of_adjacent_z_intersecting_lines_cross[SHAPE])}
 ,
-            'force_moves': {},
             'dead_points': {},  # {coord: {value: tuple, type: str, weight: int, 'fork_move': tuple, 'under_slots': list, 'layer': int}}
+            'force_moves': {},
         },
         "snd_player": {
             'up_layer': set(),
@@ -238,8 +240,8 @@ class Configs:
                                  for i in deepcopy(dict_of_intersecting_lines_cross[SHAPE])},
             'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i)}
                                 for i in deepcopy(dict_of_adjacent_z_intersecting_lines_cross[SHAPE])},
-            'force_moves': {},
             'dead_points': {},
+            'force_moves': {},
         }
     }
 
@@ -258,14 +260,18 @@ class Bot_4_lvl:
     # line_weights = {i: i + 1 for i in range(Configs.SHAPE - 1)}
 
     def __init__(self):
+        self.name = "Bot_4_lvl_orig"
+
         self.win_points = int(1e6)
 
         self.line_weights = {i: i + 1 for i in range(Configs.SHAPE)}
+        self.third_points_lines = {i: v * 2 for i, v in self.line_weights.items()}  # v * 2
+
         self.line_weights[Configs.SHAPE] = self.win_points
 
         self.fork_weights = {
             0:1,
-            1:2,
+            1:20,  # 20
             2:30,
             3:40,
             4:50,
@@ -280,12 +286,17 @@ class Bot_4_lvl:
         # self.needed_count_3rd_dead_point = 8  # TODO: [21.06.2025 by Leo]
         
     def diff_line_weights(self, line, points, stack):
-        base_weight = self.line_weights[len(points)]
 
         # force line 3p with z-1 or z=0,
-
         # third_line_bonus = 0
-        sum_weight = base_weight # + third_line_bonus
+        third_points = [i for i in line if (i not in points) and (i[2] == 3)]
+
+        if len(third_points):
+            base_weight = self.third_points_lines[len(points)]
+        else:
+            base_weight = self.line_weights[len(points)]
+
+        sum_weight = base_weight
 
         return sum_weight
 
