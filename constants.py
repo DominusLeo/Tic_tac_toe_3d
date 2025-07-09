@@ -2,7 +2,7 @@ from copy import deepcopy
 
 DIMENSION = 3
 turns_alpha = 0.9
-need_size_cf = True
+need_size_cf = False
 
 def create_intersecting_lines_dict():
     """
@@ -218,6 +218,10 @@ class Configs:
     second_bot = 0     # 0, 1, 2 - difficult of second bot
     
     interactive_input = False  # True - интерактивный ввод через matplotlib, False - терминальный ввод
+
+    depth_sorting = True      # True - sort objects by depth (closer objects in front), False - render in order added
+    reverse_depth = False     # True - reverse depth sorting (further objects in front)
+    sort_all_axes = True      # True - sort by all coordinates (x,y,z), False - sort only by z
 
     stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 

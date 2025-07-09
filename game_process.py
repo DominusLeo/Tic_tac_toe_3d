@@ -46,6 +46,10 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
     fig, ax = init_field() if rendering else [None, None]
     stack = copy.deepcopy(Configs.stack)
     field_data = pickle.loads(pickle.dumps(Configs.field_data, -1))
+    
+    # Инициализируем отображение линий сетки с правильной сортировкой по глубине
+    if rendering:
+        render_all_pieces_depth_sorted(ax, fig, stack)
 
     turn, cancels = 0, 0
     if game_log_to_save is None:
@@ -141,7 +145,9 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
 
         if turn == "exit": break  # WA for exit
 
-        render_turn(ax=ax, fig=fig, turn=list(turn), color=color, ) if rendering else None  # label=f'{color}_{turn}'
+        if rendering:
+            render_turn(ax=ax, fig=fig, turn=list(turn), color=color, label=f"{color}_{turn}")  # label=f'{color}_{turn}'
+            render_all_pieces_depth_sorted(ax, fig, stack)
         
         # Восстанавливаем обычный заголовок после хода
         if rendering and not Configs.interactive_input:

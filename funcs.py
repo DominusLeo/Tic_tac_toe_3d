@@ -103,7 +103,7 @@ def init_field():
     ax.set_zlim([1, 4.2])
     
     # # Инвертировать X-ось (справа налево)
-    # ax.invert_xaxis()
+    ax.invert_xaxis()
 
     x_scale = 4
     y_scale = 4
@@ -144,8 +144,56 @@ def update_game_title(ax, fig, current_player=None, player_num=None):
 def render_turn(ax, fig, turn, color, label=None):
     coef_s, coef_a = size_coef(turn)
     ax.scatter(*turn, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, alpha=turns_alpha * coef_s,
-               edgecolors='black')
+               edgecolors='grey', label=label)
+    if label is not None:
+        ax.legend()
     fig.show()
+
+
+def render_all_pieces_depth_sorted(ax, fig, stack):
+    """
+    Перерисовывает все фигуры в правильном порядке по глубине.
+    Используется для обновления всей сцены с правильным z-порядком.
+    """
+    if not Configs.depth_sorting:
+        return
+    
+    # Очищаем все существующие элементы (scatter plots и lines)
+    for collection in ax.collections[:]:
+        collection.remove()
+    for line in ax.lines[:]:
+        line.remove()
+    
+    # Простой подход: линии всегда в фоне, фишки всегда впереди
+    
+    # Сначала рисуем все линии заново (так как мы их удалили выше)
+    for x in range(1, Configs.SHAPE + 1):
+        for y in range(1, Configs.SHAPE + 1):
+            c_s, c_a = size_coef([x, y, 4], cf=0.9)
+            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE, 100), ys=np.linspace(y, y, 100),
+                    c="brown", linewidth=10 * c_s, alpha=0.9)
+    
+    # Теперь рисуем все фишки с сортировкой по глубине
+    for color in stack:
+        for point in stack[color]:
+            coef_s, coef_a = size_coef(point)
+            
+            # Вычисляем zorder для фишек
+            if Configs.sort_all_axes:
+                piece_zorder = point[0] * 100 + point[1] * 10 + point[2] * 1
+            else:
+                piece_zorder = point[2] * 100  # только z координата
+            
+            if Configs.reverse_depth:
+                piece_zorder = -piece_zorder
+            
+            # Добавляем большое значение чтобы фишки были всегда впереди линий
+            piece_zorder += 10000
+            
+            ax.scatter(*point, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, 
+                       alpha=turns_alpha * coef_s, edgecolors='grey', zorder=piece_zorder)
+    
+    fig.canvas.draw()
 
 
 def win_check_from_db(stack, coords, color):
@@ -559,18 +607,34 @@ def line_render(stack_render, label=None):
     # Флаг для отслеживания первой точки каждого цвета
     first_point_per_color = {}
 
+    # Собираем все точки с их цветами для сортировки по глубине
+    all_points = []
     for color in stack_render:
         for i in stack_render[color]:
-            coef_s, coef_a = size_coef([ii for ii in i])
+            all_points.append((i, color))
 
-            # Устанавливаем label только для первой точки каждого цвета
-            point_label = None
-            if color not in first_point_per_color:
-                point_label = f"{label} ({color})" if label else color
-                first_point_per_color[color] = True
+    # Сортируем по глубине, если включена сортировка
+    if Configs.depth_sorting:
+        if Configs.sort_all_axes:
+            # Сортируем по всем координатам (x, y, z) одновременно
+            # reverse=True означает, что объекты с большими координатами рисуются первыми
+            # reverse=False означает, что объекты с меньшими координатами рисуются первыми
+            all_points.sort(key=lambda x: (x[0][0], x[0][1], x[0][2]), reverse=not Configs.reverse_depth)
+        else:
+            # Сортируем только по z-координате (индекс 2)
+            all_points.sort(key=lambda x: x[0][2], reverse=not Configs.reverse_depth)
 
-            ax.scatter(*i, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True,
-                       alpha=turns_alpha * coef_s, edgecolors='grey', label=point_label)
+    for i, color in all_points:
+        coef_s, coef_a = size_coef([ii for ii in i])
+
+        # Устанавливаем label только для первой точки каждого цвета
+        point_label = None
+        if color not in first_point_per_color:
+            point_label = f"{label} ({color})" if label else color
+            first_point_per_color[color] = True
+
+        ax.scatter(*i, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True,
+                   alpha=turns_alpha * coef_s, edgecolors='grey', label=point_label)
 
     # Показываем легенду, если есть лейблы
     if label is not None or len(stack_render) > 1:
