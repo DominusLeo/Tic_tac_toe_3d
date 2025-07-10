@@ -9,19 +9,19 @@ import matplotlib.pyplot as plt
 from constants import Configs, DIMENSION, dict_of_shapes_wins
 
 
-def gravity_correction(coords, stack):
+def gravity_correction(coords, stack, return_tuple=False):
     if Configs.GRAVITY:
         if coords[-1] == 1:
-            return coords
+            return tuple(coords) if return_tuple else coords
         else:
             temp = coords.copy()
             temp[-1] = temp[-1] - 1
             if temp in itertools.chain(*stack.values()):
-                return coords
+                return tuple(coords) if return_tuple else coords
             else:
                 return gravity_correction(temp, stack)
     else:
-        return coords
+        return tuple(coords) if return_tuple else coords
 
 
 def under_points(coord):

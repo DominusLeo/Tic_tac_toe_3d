@@ -5,7 +5,7 @@ import pickle
 from bot_utils import bad_fork_logs, fork_logs, full_data_update, weight_calc
 from constants import Configs, DIMENSION, Bot_4_lvl
 from funcs import init_field, input_coords, render_turn, line_render, win_check_from_db, bot_turn, \
-    leader_bord_stat, obj_saver, obj_reader, up_layer, update_game_title
+    leader_bord_stat, obj_saver, obj_reader, up_layer, update_game_title, render_all_pieces_depth_sorted
 from utils import gravity_correction
 
 
@@ -80,15 +80,15 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
             if turn != 'cancel':
                 turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.bot_difficult, configs=bot_1_configs,
                                 field_data=field_data)
-                print(f'{color} turn: {turn}') if rendering else 0
+                # print(f'{color} turn: {turn}') if rendering else 0
         else:
             if Configs.debug_mod:
                 if turn != 'cancel':
                     turn = bot_turn(i=i, stack=stack, color=color, difficult=Configs.second_bot, configs=bot_2_configs,
                                     field_data=field_data)
-                if rendering:
-                    # input()
-                    print(f'{color} turn: {turn}')
+                # if rendering:
+                #     # input()
+                #     print(f'{color} turn: {turn}')
             else:
                 # Обновляем заголовок перед ходом игрока
                 if rendering:
@@ -108,8 +108,11 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
 
         turn = gravity_correction(coords=list(turn), stack=stack)
 
+        if rendering:
+            print(f'{color} turn: {turn}')
+
         field_data[color]['up_layer'] = set([tuple(ii) for ii in up_layer(stack)])
-        stack[color].append(turn)
+        field_data[enemy_color]['up_layer'] = set([tuple(ii) for ii in up_layer(stack)])
 
         full_data_update(field_data, tuple(turn), color, enemy_color, stack, turn_num=i)
 

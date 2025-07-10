@@ -252,6 +252,7 @@ class Configs:
 
 class Bot_3_lvl:
     def __init__(self):
+        self.name = "Bot_3_lvl"
         # self.own_weights = {i: (i + 1) * 10**i for i in range(Configs.SHAPE - 1)}
         self.own_weights = {i: i + 1 for i in range(Configs.SHAPE - 1)}
         # self.own_weights[Configs.SHAPE - 1] = 2e6
@@ -266,10 +267,16 @@ class Bot_4_lvl:
     def __init__(self):
         self.name = "Bot_4_lvl_orig"
 
-        self.win_points = int(1e6)
+        self.win_points = int(1.5e6)
+
+        # self.win_points_fork = int(4.5e6)
+        self.win_points_cross = self.win_points  #  int(2.5e6)
+        self.win_points_over = self.win_points  # int(7e6)  # 3.5
+        self.win_points_dead = self.win_points  # int(5.5e6)
+        self.win_points_force = self.win_points  # int(6.5e6)
 
         self.line_weights = {i: i + 1 for i in range(Configs.SHAPE)}
-        self.third_points_lines = {i: v * 2 for i, v in self.line_weights.items()}  # v * 2
+        self.third_points_lines = {i: v * 4 for i, v in self.line_weights.items()}  # v * 2
 
         self.line_weights[Configs.SHAPE] = self.win_points
 
@@ -277,11 +284,12 @@ class Bot_4_lvl:
             0:1,
             1:20,  # 20
             2:30,
-            3:40,
+            3:300,
             4:50,
         }
 
         # self.block_almost_line = (Configs.SHAPE - 1) * 2
+        self.force_weight = 0
 
         self.odd_dead_points = 10000
         self.common_3rd_dead_point = 50000 #400

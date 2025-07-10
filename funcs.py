@@ -403,7 +403,8 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
 
     # all possible turns list
     coords_arr = up_layer(stack)
-    field_data[color]['up_layer'] = set(tuple(ii) for ii in coords_arr)
+    # field_data[color]['up_layer'] = set(tuple(ii) for ii in coords_arr)
+    # field_data[enemy_color]['up_layer'] = set(tuple(ii) for ii in coords_arr)
 
     count_of_points = {0: None}
 
@@ -517,24 +518,28 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
             temp_field_data = field_data_variants[coord]
             enemy_alt_data = pickle.loads(pickle.dumps(temp_field_data, -1))
 
+            copy_stack = pickle.loads(pickle.dumps(stack, -1))
+            enemy_copy_stack = pickle.loads(pickle.dumps(stack, -1))
+
             # weights before turn
             start_our_weight = weight_calc(temp_field_data, color, )
             start_enemy_weight = weight_calc(temp_field_data, enemy_color, )   # best comp for next up
 
             # weights for our turn now
-            full_data_update(temp_field_data, coord, color, enemy_color, stack, turn_num=i, bot_weights=bot_weights)
+            full_data_update(temp_field_data, coord, color, enemy_color, copy_stack, turn_num=i, bot_weights=bot_weights, comment='our cur turn')
             our_weight = weight_calc(temp_field_data, color, )
             enemy_weight = weight_calc(temp_field_data, enemy_color, )
 
             # weights if enemy same turn
-            full_data_update(enemy_alt_data, coord, enemy_color, color, stack, turn_num=i + 1, bot_weights=bot_weights)
+            full_data_update(enemy_alt_data, coord, enemy_color, color, enemy_copy_stack, turn_num=i + 1, bot_weights=bot_weights, comment='enemy same turn')
             alt_our_weight = weight_calc(enemy_alt_data, color, )
             alt_enemy_weight = weight_calc(enemy_alt_data, enemy_color, )  # cool fork pred
 
             # weights after enemy up turn on our
             over_coord = (coord[0], coord[1], coord[2] + 1) if coord[2] < Configs.SHAPE else None
-            if over_coord is not None:
-                full_data_update(temp_field_data, over_coord, enemy_color, color, stack, turn_num=i + 1, bot_weights=bot_weights)
+            over_over_coord = (coord[0], coord[1], coord[2] + 2)
+            if (over_coord is not None) and (over_over_coord not in temp_field_data[color]['dead_points']):
+                full_data_update(temp_field_data, over_coord, enemy_color, color, copy_stack, turn_num=i + 1, bot_weights=bot_weights, comment='enemy up turn')
                 our_future_weight = weight_calc(temp_field_data, color, )
                 enemy_future_weight = weight_calc(temp_field_data, enemy_color, )  # cool fork pred
             else:
