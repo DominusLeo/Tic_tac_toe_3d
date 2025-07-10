@@ -49,16 +49,19 @@ def weight_calc(field_data, color):
 
     # lines_points
     our_lines_points1 = sum([data['weight'] for line, data in field_data[color]['lines_left'].items()])
+
     our_3rd_dead_points_weights1 = sum([v['weight'] for i, v in field_data[color]['dead_points'].items()])
 
-    # forks points
+    # if our_3rd_dead_points_weights != 0:
+    #     ...
+
     our_over_fork_weights1 = sum([v['weight'] for i, v in field_data[color]['over_forks_left'].items()])
     our_cross_fork_weights1 = sum([v['weight'] for i, v in field_data[color]['cross_forks_left'].items()])
 
     # force moves
-    force_moves_weights = sum([v['weight'] for i, v in field_data[color]['force_moves'].items()])
+    ...
 
-    our_after_turn_sum = our_lines_points1 + our_3rd_dead_points_weights1 + our_over_fork_weights1 + our_cross_fork_weights1 + force_moves_weights
+    our_after_turn_sum = our_lines_points1 + our_3rd_dead_points_weights1 + our_over_fork_weights1 + our_cross_fork_weights1
 
     return our_after_turn_sum
 
@@ -81,79 +84,8 @@ def weight_calc(field_data, color):
 # ____________________________________________________________
 
 
-def find_force_moves(field_data, coord, color, stack=None, bot_weights=Bot_5_lvl(), turn_num=None, my_turn=True, comment='', enemy_color=None,):
-    force_moves = {}
-
-    two_point_lines = {i: v for i, v in field_data[color]['lines_left'].items() if len(v['points']) == 2}
-    three_point_lines = {i: v for i, v in field_data[color]['lines_left'].items() if len(v['points']) == 3}
-
-    # if color == 'black':
-    #     ...
-
-    for line, v in three_point_lines.items():
-        last_point = list(set(line) - set(v['points']))[0]
-        if last_point in field_data[enemy_color]['dead_points']:
-            continue
-
-        if last_point in field_data[color]['up_layer']:
-            # if comment in ()
-            if coord not in force_moves:
-                force_moves[coord] = {'force_coord': [last_point], 'weight': -bot_weights.force_weight}
-            else:
-                force_moves[coord]['force_coord'].append(last_point)
-                if len(set(force_moves[coord]['force_coord'])) >= 2:
-                    force_moves[coord]['weight'] = bot_weights.win_points_force
-
-            if (last_point[0], last_point[1], last_point[2] + 1) in field_data[color]['dead_points']:
-                force_moves[coord] = {'force_coord': [last_point], 'weight': bot_weights.win_points_force}
-
-    for line, v in two_point_lines.items():
-        empty_points = list(set(line) - set(v['points']))
-
-        # Проверяем, находятся ли оба пустых места на верхнем доступном слое
-        if all([(i in field_data[color]['up_layer']) for i in empty_points]):
-            if empty_points[0] not in force_moves:
-                force_moves[empty_points[0]] = {'force_coord': [empty_points[1]], 'weight': bot_weights.force_weight}
-            else:
-                force_moves[empty_points[0]]['force_coord'].append(empty_points[1])
-
-                # if not my_turn:
-                    # force_moves[empty_points[0]]['weight'] = bot_weights.win_points_force
-
-            if empty_points[1] not in force_moves:
-                force_moves[empty_points[1]] = {'force_coord': [empty_points[0]], 'weight': bot_weights.force_weight}
-            else:
-                force_moves[empty_points[1]]['force_coord'].append(empty_points[0])
-
-                # if not my_turn:
-                #     force_moves[empty_points[1]]['weight'] = bot_weights.win_points_force
-
-        # Проверяем, может ли верхняя точка упасть на нижнюю по гравитации
-        elif tuple(gravity_correction(list(max(empty_points)), stack)) == min(empty_points):
-            if min(empty_points) not in force_moves:
-                force_moves[min(empty_points)] = {'force_coord': [max(empty_points)], 'weight': bot_weights.force_weight}
-            else:
-                force_moves[min(empty_points)]['force_coord'].append(max(empty_points))
-
-                # if not my_turn:
-                #     force_moves[min(empty_points)]['weight'] = bot_weights.win_points_force
-
-
-    # three_point_dead_line = {}  # force move under dead_point
-    for d_p in field_data[color]['dead_points']:
-        f_m = (d_p[0], d_p[1], d_p[2] - 1) if (d_p[2] > 1) else None
-
-        if gravity_correction(list(f_m), stack, return_tuple=True) == f_m:
-            if f_m not in force_moves:
-                force_moves[f_m] = {'force_coord': [d_p], 'weight': bot_weights.force_weight}
-            else:
-                force_moves[f_m]['force_coord'].append(d_p)
-                force_moves[f_m]['weight'] += bot_weights.force_weight
-
-                # if not my_turn:
-                #     force_moves[f_m]['weight'] = bot_weights.win_points_force
-
-    return force_moves
+def find_force_moves():
+    return
 
 
 def find_dead_points(our_lines_dct, enemy_lines_dct, coord=None, color=None, stack=None, turn_num=None, up_layer=None,
@@ -197,7 +129,7 @@ def find_dead_points(our_lines_dct, enemy_lines_dct, coord=None, color=None, sta
     for dp, v in our_dead_points.items():
         if v['under_slots'][0] in our_dead_points:
             v['type'] = 'fork'
-            v['weight'] = bot_weights.win_points_dead // (len(v['under_slots']) + 1)
+            v['weight'] = bot_weights.win_points // (len(v['under_slots']) + 1)
             v['fork_move'] = set(v['under_slots'])
 
         elif v['layer'] == 3:
@@ -210,7 +142,7 @@ def find_dead_points(our_lines_dct, enemy_lines_dct, coord=None, color=None, sta
     for dp, v in enemy_dead_points.items():
         if v['under_slots'][0] in enemy_dead_points:
             v['type'] = 'fork'
-            v['weight'] = bot_weights.win_points_dead // (len(v['under_slots']) + 1)
+            v['weight'] = bot_weights.win_points // (len(v['under_slots']) + 1)
             v['fork_move'] = set(v['under_slots'])
 
         elif v['layer'] == 3:
@@ -277,7 +209,7 @@ def filter_cross_forks_stack(coord, my_turn=True, field_data=None, color=None, e
 
                         if (gravity_correction(list(p_1), stack) == list(p_1)) and (gravity_correction(list(p_2), stack) == list(p_2)) \
                             and (com_point in points):
-                            win_weight = bot_weights.win_points_cross
+                            win_weight = bot_weights.win_points
                     # elif not (set(under_points(p_1)) & set(field_data[enemy_color]['dead_points'].keys())):
                     #     win_weight = bot_weights.win_points // 2
             else:
@@ -327,7 +259,7 @@ def filter_over_forks_stack(coord, my_turn=True, color=None, enemy_color=None,  
                         # TODO: [30.06.2025 by Leo] need we extra weight calcs for closed fork?
                         if (len(d_p) == 1) and (len((over_fork[0] | over_fork[1]) - set(points)) == 2) \
                                 and not (set(under_points(max(d_p[0]))) & set(field_data[enemy_color]['dead_points'])):
-                            win_weight = bot_weights.win_points_over // 2
+                            win_weight = bot_weights.win_points // 2
             else:
                 pop_lst.append(over_fork)
 
@@ -344,48 +276,39 @@ def filter_over_cross_forks_stack(orig_over_cross_forks_set, coord, my_turn=True
     return
 
 
-def full_data_update(temp_field_data, coord, color, enemy_color, stack, turn_num, bot_weights=Bot_4_lvl(), comment=''):
+def full_data_update(temp_field_data, coord, color, enemy_color, stack, turn_num, bot_weights=Bot_4_lvl()):
     our_field = temp_field_data[color]
     enemy_field = temp_field_data[enemy_color]
 
-    copy_stack = pickle.loads(pickle.dumps(stack, -1))
-    copy_stack[color].append(list(coord))
-
     # filter lines left
-    our_field['lines_left'] = filter_lines_stack(our_field['lines_left'], coord, my_turn=True, stack=copy_stack)
-    enemy_field['lines_left'] = filter_lines_stack(enemy_field['lines_left'], coord, my_turn=False, stack=copy_stack)
+    our_field['lines_left'] = filter_lines_stack(our_field['lines_left'], coord, my_turn=True, stack=stack)
+    enemy_field['lines_left'] = filter_lines_stack(enemy_field['lines_left'], coord, my_turn=False, stack=stack)
 
     # operations with dead points  # TODO: [21.06.2025 by Leo]
     our_field['dead_points'], enemy_field['dead_points'] = find_dead_points(our_field['lines_left'],
                                                                             enemy_field['lines_left'], color=color,
-                                                                            stack=copy_stack, coord=coord,  # is copy_stack right?
+                                                                            stack=stack, coord=coord,
                                                                             up_layer=temp_field_data[color]['up_layer'],
                                                                             bot_weights=bot_weights, turn_num=turn_num)
 
-    # find force moves combs  # TODO: [04.07.2025 by Leo]
-    our_field['up_layer'] = up_layer(copy_stack, return_tuple=True)
-    enemy_field['up_layer'] = up_layer(copy_stack, return_tuple=True)
-
-    our_field['force_moves'] = find_force_moves(temp_field_data, coord=coord, color=color, stack=copy_stack, comment=comment, enemy_color=enemy_color)
-    enemy_field['force_moves'] = find_force_moves(temp_field_data, coord=coord, color=enemy_color, stack=copy_stack, my_turn=False, comment=comment, enemy_color=color)
+    # find force moves combs
+    # our_field['force_moves'], enemy_field['force_moves'] =
 
     # filter cross forks
     our_field['cross_forks_left'] = filter_cross_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=True,
-                                                             field_data=temp_field_data, stack=copy_stack,  # is copy_stack right?
+                                                             field_data=temp_field_data, stack=stack,
                                                              bot_weights=bot_weights)
     enemy_field['cross_forks_left'] = filter_cross_forks_stack(coord, enemy_color=enemy_color, color=color,
                                                                my_turn=False,
-                                                               field_data=temp_field_data, stack=copy_stack,  # is copy_stack right?
+                                                               field_data=temp_field_data, stack=stack,  # is copy_stack right?
                                                                bot_weights=bot_weights)
 
     # filter over forks
     our_field['over_forks_left'] = filter_over_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=True,
-                                                           field_data=temp_field_data, stack=copy_stack,
+                                                           field_data=temp_field_data, stack=stack,
                                                            bot_weights=bot_weights)
     enemy_field['over_forks_left'] = filter_over_forks_stack(coord, enemy_color=enemy_color, color=color, my_turn=False,
-                                                             field_data=temp_field_data, stack=copy_stack,
+                                                             field_data=temp_field_data, stack=stack,
                                                              bot_weights=bot_weights)
-
-    return
 
     stack[color].append(list(coord))
