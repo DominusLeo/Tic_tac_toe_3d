@@ -1,11 +1,10 @@
 import itertools
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import copy
 from tqdm import trange
 
-from constants import Configs, Bot_3_lvl
+from constants import Configs, Bot_3_lvl, Bot_4_lvl
 from game_process import single_game
 
 hz = Configs()
@@ -21,7 +20,7 @@ snd_color = 'black'
 hz.stack = {fst_color: [], snd_color: []}  # set color and name for every player, used by matplotlib
 hz.field_data = {fst_color: hz.field_data['fst_player'], snd_color: hz.field_data['snd_player']}
 
-hz.play_vs_bot = 2       # 0, 1, 2, 3 - the presence and number of the bot's move
+hz.play_vs_bot = 1  # bot_1_configs       # 0, 1, 2, 3 - the presence and number of the bot's move
 hz.bot_difficult = 4
 
 hz.debug_mod = True  # random turns by pc without players decisions
@@ -32,15 +31,24 @@ if __name__ == "__main__":
     win_stat = copy.deepcopy(hz.stack)
     win_stat['nobody'] = []
 
-    if hz.play_vs_bot == 1:
-        print(f"main_{hz.bot_difficult}_lvl_bot VS debug_{hz.second_bot}_lvl_bot")
-    else:
-        print(f"debug_{hz.second_bot}_lvl_bot VS main_{hz.bot_difficult}_lvl_bot")
-
     # set configs for 3rd lvl bot
-    bot_1_configs = Bot_3_lvl()
-    # bot_1_configs.enemy_weights = {i: bot_1_configs.enemy_weights[i] ** 2 for i in bot_1_configs.enemy_weights}
-    # bot_1_configs.own_weights = {i: bot_1_configs.own_weights[i] ** 2 for i in bot_1_configs.own_weights}
+    if hz.second_bot == 3:
+        bot_1_configs = Bot_3_lvl()  # hz.play_vs_bot = 2
+        bot_1_configs.name = 'main_3_lvl_bot'
+
+    elif hz.second_bot == 4:
+        bot_1_configs = Bot_4_lvl()
+
+        # # bot_1_configs.fork_weights[1] = 2
+        bot_1_configs.name = 'test_4_lvl_bot_0_no_force_moves'
+        bot_1_configs.win_points_force = 0
+        bot_1_configs.force_weight = 0
+
+    if hz.play_vs_bot == 1:
+        print(f"const_{hz.bot_difficult}_lvl_bot VS {bot_1_configs.name}")
+    else:
+        print(f"{bot_1_configs.name} VS const_{hz.bot_difficult}_lvl_bot")
+
 
     for trying in trange(20):
         # breakpoint()
