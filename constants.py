@@ -267,7 +267,7 @@ class Bot_4_lvl:
     def __init__(self):
         self.name = "Bot_4_lvl_orig"
 
-        self.win_points = int(1.5e6)
+        self.win_points = int(1e6)
 
         # self.win_points_fork = int(4.5e6)
         self.win_points_cross = self.win_points  #  int(2.5e6)
@@ -276,27 +276,40 @@ class Bot_4_lvl:
         self.win_points_force = self.win_points  # int(6.5e6)
 
         self.line_weights = {i: i + 1 for i in range(Configs.SHAPE)}
-        self.third_points_lines = {i: v * 4 for i, v in self.line_weights.items()}  # v * 2
+        self.third_points_lines = {i: v * 2 for i, v in self.line_weights.items()}  # v * 2
+        """
+        when all fork default, big DP and v * 2 3rd lines
+        Total games played: 192
+        Total wins: 141 (73.4%)
+        Total loses: 39 (20.3%)
+        Total draws: 12 (6.2%)
+        """
 
         self.line_weights[Configs.SHAPE] = self.win_points
 
+        """
+        all default with big dp (small DP - much worse)
+        Total games played: 192
+        Total wins: 126 (65.6%)
+        Total loses: 53 (27.6%)
+        Total draws: 13 (6.8%)
+        """
         self.fork_weights = {
             0:1,
-            1:20,  # 20
+            1:2,  # 20
             2:30,
-            3:300,
-            4:50,
+            3:40,
+            4:5,
         }
 
         # self.block_almost_line = (Configs.SHAPE - 1) * 2
         self.force_weight = 0
 
+        # very important big weights
         self.odd_dead_points = 10000
         self.common_3rd_dead_point = 50000 #400
         self.own_3rd_dead_point = 100000 # 800
 
-        # self.needed_count_3rd_dead_point = 8  # TODO: [21.06.2025 by Leo]
-        
     def diff_line_weights(self, line, points, stack):
 
         # force line 3p with z-1 or z=0,
@@ -354,57 +367,10 @@ class Bot_4_lvl:
     #
     #     return sum_weight + com_3rd_dp_weight + our_3rd_dp_weight
 
-    # def cross_fork_weights(self, our_cross_forks, enemy_cross_forks, stack):
-    #     stack_points = set([tuple(i) for i in list(stack.values())[0] + list(stack.values())[1]])
-    #
-    #     our_weights = 0
-    #     for pair, points in our_cross_forks.items():
-    #         points = points['points']
-    #         left_line_w = len(set(points) & set(pair[0]))
-    #         right_line_w = len(set(points) & set(pair[1]))
-    #
-    #         our_weights += (self.fork_weights[left_line_w] + self.fork_weights[right_line_w])
-    #         # TODO: [26.06.2025 by Leo] - init fork situation
-    #         # if len(points) == 6:
-    #         #     com_point = list(set(pair[0]) & set(pair[1]))[0]
-    #         #     under_com_points = [(com_point[0], com_point[1], com_point[2] - i) for i in range(1, com_point[2])]
-    #         #     if (com_point[2] == 1) or ():
-    #         #         ...
-    #
-    #     enemy_weights = 0
-    #     for pair, points in enemy_cross_forks.items():
-    #         points = points['points']
-    #         left_line_w = len(set(points) & set(pair[0]))
-    #         right_line_w = len(set(points) & set(pair[1]))
-    #
-    #         enemy_weights += (self.fork_weights[left_line_w] + self.fork_weights[right_line_w])
-    #
-    #     return our_weights, enemy_weights
+class Bot_5_lvl(Bot_4_lvl):
 
-    # def over_fork_weights(self, our_over_forks, enemy_over_forks, our_dead_p, enemy_dead_p):
-    #     our_weights = 0
-    #     for pair, points in our_over_forks.items():
-    #         points = points['points']
-    #         left_line_w = len(set(points) & set(pair[0]))
-    #         right_line_w = len(set(points) & set(pair[1]))
-    #
-    #         our_weights += (self.fork_weights[left_line_w] + self.fork_weights[right_line_w])
-    #         # TODO: [26.06.2025 by Leo] - init fork situation
-    #         if (len(set(pair[0]) & set(pair[1])) - len(points)) < 3:
-    #             ...
-    #
-    #     enemy_weights = 0
-    #     for pair, points in enemy_over_forks.items():
-    #         points = points['points']
-    #         left_line_w = len(set(points) & set(pair[0]))
-    #         right_line_w = len(set(points) & set(pair[1]))
-    #
-    #         enemy_weights += (self.fork_weights[left_line_w] + self.fork_weights[right_line_w])
-    #         if (len(set(pair[0]) & set(pair[1])) - len(points)) < 3:
-    #             ...
-    #
-    #     return our_weights, enemy_weights
+    def __init__(self):
+        super().__init__()
+        self.name = "Bot_5_lvl"
 
-    # def line_weights_3rd(self, line, stack):
-    #     return self.line_weights[line[0]] + self.line_weights[line[1]] + self.line_weights[line[2]]
-
+        self.th_points = 4e5

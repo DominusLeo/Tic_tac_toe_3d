@@ -27,12 +27,20 @@ hz.debug_mod = True  # random turns by pc without players decisions
 hz.second_bot = 3     # 0, 1, 2, 3 - difficult of second bot
 
 
+class hz_bot():
+    def __init__(self):
+        self.name  = 'hz'
+
+
 if __name__ == "__main__":
     win_stat = copy.deepcopy(hz.stack)
     win_stat['nobody'] = []
 
+    if hz.second_bot < 3:
+        bot_1_configs = hz_bot()
+
     # set configs for 3rd lvl bot
-    if hz.second_bot == 3:
+    elif hz.second_bot == 3:
         bot_1_configs = Bot_3_lvl()  # hz.play_vs_bot = 2
         bot_1_configs.name = 'main_3_lvl_bot'
 
@@ -51,20 +59,26 @@ if __name__ == "__main__":
 
 
     for trying in trange(20):
-        # breakpoint()
         color, i, is_win = single_game(rendering=render, bot_2_configs=None, bot_1_configs=bot_1_configs,
-                                       Configs=hz, game_log_to_save=[])
-
+                                       Configs=hz, stack_weights_to_save={fst_color: [], snd_color: []})
         win_stat[color].append(i) if is_win else win_stat['nobody'].append(i)
 
+    hz.stack = {snd_color: [], fst_color: []}
+    hz.play_vs_bot = 2
+    for trying in trange(20):
+        color, i, is_win = single_game(rendering=render, bot_2_configs=None, bot_1_configs=bot_1_configs,
+                                       Configs=hz, stack_weights_to_save={snd_color: [], fst_color: []})
+        win_stat[color].append(i) if is_win else win_stat['nobody'].append(i)
+
+
     # stat analyse
-    main_bot_color = list(hz.stack.keys())[hz.play_vs_bot - 1]
-    debug_bot_color = list(hz.stack.keys())[hz.play_vs_bot % 2]
+    main_bot_color = fst_color
+    debug_bot_color = snd_color
 
     wins = win_stat[main_bot_color].__len__()
     loses = win_stat[debug_bot_color].__len__()
     nobody = win_stat['nobody'].__len__()
 
-    print(f'wins: {wins} / {trying + 1} = {wins / (trying + 1) * 100}%')
-    print(f'loses: {loses} / {trying + 1} = {loses / (trying + 1) * 100}%')
-    print(f'draw: {nobody} / {trying + 1} = {nobody / (trying + 1) * 100}%')
+    print(f'wins: {wins} / {wins + loses + nobody} = {wins / (wins + loses + nobody) * 100}%')
+    print(f'loses: {loses} / {wins + loses + nobody} = {loses / (wins + loses + nobody) * 100}%')
+    print(f'draw: {nobody} / {wins + loses + nobody} = {nobody / (wins + loses + nobody) * 100}%')

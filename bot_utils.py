@@ -1,6 +1,6 @@
 import itertools
 import pickle
-
+import jmespath as jp
 from constants import *
 from utils import under_points, gravity_correction
 
@@ -10,6 +10,66 @@ bad_fork_logs = {'bad_one_line_cross_fork': {},
 
 fork_logs = {'cross_fork': {},
              'over_fork': {}}
+
+
+def win_check_from_db(stack, coords, color):
+    for line in itertools.combinations(stack[color], Configs.SHAPE):
+        if coords in line:
+            if set([tuple(i) for i in line]) in dict_of_shapes_wins[Configs.SHAPE]:
+                return line
+    return False
+
+
+def pos_turns(coords_arr, stack, color, enemy_color):
+    weight = 0
+
+    # check for win turns
+    for coord in coords_arr:
+        temp_stack = pickle.loads(pickle.dumps(stack, -1))
+        temp_stack[color].append(coord)
+
+        if win_check_from_db(temp_stack, coord, color):
+            weight = 1e6
+            return [tuple([coord, weight])]
+
+    # check for loosing turns
+    # where to move to close enemy line
+    for coord in coords_arr:
+        temp_stack = pickle.loads(pickle.dumps(stack, -1))
+        temp_stack[enemy_color].append(coord)
+
+        if win_check_from_db(temp_stack, coord, enemy_color):
+            # print('force move', end=' ')  # TODO: [02.07.2025 by Leo]
+            return [tuple([coord, weight])]
+
+    pos_turns_count = len(coords_arr)
+    # print(f"{pos_turns = }")
+
+    # remove turns under loose (forbieden turns)
+    coords_arr_c = coords_arr.copy()
+    for coord in coords_arr_c:
+        temp_stack = pickle.loads(pickle.dumps(stack, -1))
+        temp_coord = deepcopy(coord)
+        temp_coord[-1] += 1
+        temp_stack[enemy_color].append(temp_coord)
+
+        if win_check_from_db(temp_stack, temp_coord, enemy_color):
+            coords_arr.remove(coord)
+
+    if len(coords_arr) == 0:
+        print('no good turns found')
+        weight = -1e6
+        return [tuple([coord, weight])]
+
+    return [(i, 0) for i in coords_arr]
+
+
+def z_shift_point(point, z_shift):
+    if isinstance(point, tuple):
+        return (point[0], point[1], point[2] + z_shift)
+    elif isinstance(point, list):
+        return [point[0], point[1], point[2] + z_shift]
+    return None
 
 
 def up_layer(stack, return_tuple=False):
@@ -112,31 +172,31 @@ def find_force_moves(field_data, coord, color, stack=None, bot_weights=Bot_5_lvl
 
         # Проверяем, находятся ли оба пустых места на верхнем доступном слое
         if all([(i in field_data[color]['up_layer']) for i in empty_points]):
-            if empty_points[0] not in force_moves:
-                force_moves[empty_points[0]] = {'force_coord': [empty_points[1]], 'weight': bot_weights.force_weight}
-            else:
-                force_moves[empty_points[0]]['force_coord'].append(empty_points[1])
+            if z_shift_point(empty_points[0], 1) not in field_data[enemy_color]['dead_points']:
+                if (empty_points[0] not in force_moves):
+                    force_moves[empty_points[0]] = {'force_coord': [empty_points[1]], 'weight': bot_weights.force_weight}
+                else:
+                    force_moves[empty_points[0]]['force_coord'].append(empty_points[1])
+                    # if not my_turn:
+                        # force_moves[empty_points[0]]['weight'] = bot_weights.win_points_force
 
-                # if not my_turn:
-                    # force_moves[empty_points[0]]['weight'] = bot_weights.win_points_force
-
-            if empty_points[1] not in force_moves:
-                force_moves[empty_points[1]] = {'force_coord': [empty_points[0]], 'weight': bot_weights.force_weight}
-            else:
-                force_moves[empty_points[1]]['force_coord'].append(empty_points[0])
-
-                # if not my_turn:
-                #     force_moves[empty_points[1]]['weight'] = bot_weights.win_points_force
+            if z_shift_point(empty_points[1], 1) not in field_data[enemy_color]['dead_points']:
+                if empty_points[1] not in force_moves:
+                    force_moves[empty_points[1]] = {'force_coord': [empty_points[0]], 'weight': bot_weights.force_weight}
+                else:
+                    force_moves[empty_points[1]]['force_coord'].append(empty_points[0])
+                    # if not my_turn:
+                    #     force_moves[empty_points[1]]['weight'] = bot_weights.win_points_force
 
         # Проверяем, может ли верхняя точка упасть на нижнюю по гравитации
         elif tuple(gravity_correction(list(max(empty_points)), stack)) == min(empty_points):
-            if min(empty_points) not in force_moves:
-                force_moves[min(empty_points)] = {'force_coord': [max(empty_points)], 'weight': bot_weights.force_weight}
-            else:
-                force_moves[min(empty_points)]['force_coord'].append(max(empty_points))
-
-                # if not my_turn:
-                #     force_moves[min(empty_points)]['weight'] = bot_weights.win_points_force
+            if max(empty_points) not in field_data[enemy_color]['dead_points']:
+                if min(empty_points) not in force_moves:
+                    force_moves[min(empty_points)] = {'force_coord': [max(empty_points)], 'weight': bot_weights.force_weight}
+                else:
+                    force_moves[min(empty_points)]['force_coord'].append(max(empty_points))
+                    # if not my_turn:
+                    #     force_moves[min(empty_points)]['weight'] = bot_weights.win_points_force
 
 
     # three_point_dead_line = {}  # force move under dead_point
@@ -149,7 +209,6 @@ def find_force_moves(field_data, coord, color, stack=None, bot_weights=Bot_5_lvl
             else:
                 force_moves[f_m]['force_coord'].append(d_p)
                 force_moves[f_m]['weight'] += bot_weights.force_weight
-
                 # if not my_turn:
                 #     force_moves[f_m]['weight'] = bot_weights.win_points_force
 
@@ -169,7 +228,7 @@ def find_dead_points(our_lines_dct, enemy_lines_dct, coord=None, color=None, sta
             p_under_lst = [(p[0], p[1], p[2] - i) for i in range(1, p[2])]
             p_under = p_under_lst[0] if p_under_lst else None
 
-            if (p_under is not None) and (p_under not in stack_points) and (p_under != tuple(coord)):
+            if (p_under is not None) and (list(p_under) not in stack_points) and (p_under != tuple(coord)):
                 our_dead_points[p] = {'layer': p[2], 'type': None, 'weight': bot_weights.odd_dead_points, 'under_slots': p_under_lst, 'fork_move': None}
                 our_copy.append(p)
 
@@ -182,7 +241,7 @@ def find_dead_points(our_lines_dct, enemy_lines_dct, coord=None, color=None, sta
             p_under_lst = [(p[0], p[1], p[2] - i) for i in range(1, p[2])]
             p_under = p_under_lst[0] if p_under_lst else None
 
-            if (p_under is not None) and (p_under not in stack_points) and (p_under != tuple(coord)):
+            if (p_under is not None) and (list(p_under) not in stack_points) and (p_under != tuple(coord)):
                 enemy_dead_points[p] = {'layer': p[2], 'type': None, 'weight': bot_weights.odd_dead_points, 'under_slots': p_under_lst, 'fork_move': None}
                 enemy_copy.append(p)
 
@@ -387,3 +446,75 @@ def full_data_update(temp_field_data, coord, color, enemy_color, stack, turn_num
                                                              bot_weights=bot_weights)
 
     stack[color].append(list(coord))
+
+
+def build_chains(fm_dct, new_field_data, turn_num, new_stack, cur_color, cur_enemy_color, bot_weights=Bot_5_lvl(), comment=''):
+    chains = []
+
+    def dfs(current_fd, chain, turn_num, up_field_data, up_stack, our_w_diff=0, enemy_w_diff=0, comment=comment):
+        # Depth-First Search
+        # Базовый случай: если словарь пуст, сохраняем цепочку
+        if not current_fd:
+            chains.append(chain.copy())
+            return
+
+        if chain and ((abs(our_w_diff) >= bot_weights.th_points) or (abs(enemy_w_diff) >= bot_weights.th_points)):
+            chains.append(chain.copy())
+            return
+
+        # Иначе — для каждого ключа/значения создаём новый ответвляющийся путь
+        for k, v in current_fd.items():
+            new_fd = pickle.loads(pickle.dumps(up_field_data, -1))
+            new_st = pickle.loads(pickle.dumps(up_stack, -1))
+
+            pos_turns_arr = pos_turns(up_layer(up_stack, return_tuple=False), up_stack, cur_color, cur_enemy_color)
+            coords_arr = [tuple(i[0]) for i in pos_turns_arr]
+            # if len(pos_turns_arr) == 1:
+            #     next_fd = new_fd[cur_color]['force_moves']
+            #     next_fd.pop(k)
+            #     if chain and (chain not in chains):
+            #         dfs(next_fd, chain, turn_num, new_fd, new_st)
+
+            our_weights0 = weight_calc(new_fd, cur_color, )
+            enemy_weights0 = weight_calc(new_fd, cur_enemy_color, )
+            start_weight0 = our_weights0 - enemy_weights0
+
+            if (k[0], k[1], k[2]) in coords_arr: # not in up_field_data[cur_enemy_color]['dead_points']:
+                # 2) Получим следующий словарь
+                full_data_update(new_fd, k, cur_color, cur_enemy_color, stack=new_st, turn_num=turn_num)
+
+                our_weights1 = weight_calc(new_fd, cur_color, )
+                enemy_weights1 = weight_calc(new_fd, cur_enemy_color, )
+                weight1 = our_weights1 - enemy_weights1
+
+                full_data_update(new_fd, v['force_coord'][0], cur_enemy_color, cur_color, stack=new_st, turn_num=turn_num + 1)
+                our_weights2 = weight_calc(new_fd, cur_color)
+                enemy_weights2 = weight_calc(new_fd, cur_enemy_color, )
+                weight2 = enemy_weights2 - our_weights2
+
+                next_fd = new_fd[cur_color]['force_moves']  # transform(current_fd, k, v)
+
+                # 1) Запомним текущий шаг
+                chain.append({k: weight1})
+                chain.append({v['force_coord'][0]: weight2})
+
+                # 3) Спустимся глубже
+                dfs(next_fd, chain, turn_num + 2, new_fd, new_st, comment=comment,
+                    our_w_diff=our_weights2 - our_weights0, enemy_w_diff=enemy_weights2 - enemy_weights0)
+
+                # 4) Откатим изменения chain для следующей ветки
+                chain.pop()
+                chain.pop()
+            else:
+                if len(coords_arr) >= 1:
+                    next_fd = new_fd[cur_color]['force_moves']
+                    next_fd.pop(k)
+                    if chain and (chain not in chains):
+                        dfs(next_fd, chain, turn_num, new_fd, new_st)
+                else:
+                    chain.append({coords_arr[0][0]: coords_arr[0][1]})
+                    dfs({}, chain, turn_num, new_fd, new_st, coords_arr[0][1], -coords_arr[0][1], comment=comment)
+
+    # Запускаем обход
+    dfs(fm_dct, [], turn_num, new_field_data, new_stack)
+    return chains

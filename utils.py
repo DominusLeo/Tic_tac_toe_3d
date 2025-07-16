@@ -10,6 +10,8 @@ from constants import Configs, DIMENSION, dict_of_shapes_wins
 
 
 def gravity_correction(coords, stack, return_tuple=False):
+    coords = [int(i) for i in coords]
+
     if Configs.GRAVITY:
         if coords[-1] == 1:
             return tuple(coords) if return_tuple else coords
@@ -21,7 +23,7 @@ def gravity_correction(coords, stack, return_tuple=False):
             else:
                 return gravity_correction(temp, stack)
     else:
-        return tuple(coords) if return_tuple else coords
+        return tuple([coords]) if return_tuple else coords
 
 
 def under_points(coord):

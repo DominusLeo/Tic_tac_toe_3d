@@ -13,8 +13,9 @@ from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import datetime as dt
 
-from bot_utils import full_data_update, weight_calc, up_layer
-from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha, Bot_4_lvl, need_size_cf
+from bot_utils import full_data_update, weight_calc, up_layer, build_chains, pos_turns
+from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha, Bot_4_lvl, need_size_cf, \
+    Bot_5_lvl
 from utils import free_lines_counter, gravity_correction, debug_turn
 
 # from matplotlib.widgets import TextBox
@@ -24,6 +25,45 @@ from utils import free_lines_counter, gravity_correction, debug_turn
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 sns.set(style='darkgrid')
+
+
+def draw_grid_lines_as_points(ax, zorder_offset=0):
+    """
+    Заменяет линии сетки на точки с правильной сортировкой по глубине
+    
+    Args:
+        ax: matplotlib 3D axes
+        zorder_offset: базовый offset для zorder (линии должны быть в фоне)
+    """
+    for x in range(1, Configs.SHAPE + 1):
+        for y in range(1, Configs.SHAPE + 1):
+            c_s, c_a = size_coef([x, y, 4], cf=0.9)
+            
+            # Вычисляем zorder для линии сетки - всегда делаем их низкими
+            # чтобы они были позади фишек
+            if Configs.depth_sorting:
+                if Configs.sort_all_axes:
+                    line_zorder = x * 99 + y * 9 #+ 2 * 1  # средняя z-координата
+                else:
+                    line_zorder = 2 * 99  # средняя z-координата
+                
+                if Configs.reverse_depth:
+                    line_zorder = -line_zorder
+                
+                # Устанавливаем очень низкий zorder для линий - они всегда в фоне
+                line_zorder = line_zorder + zorder_offset - 1000000
+            else:
+                line_zorder = -1000000  # Всегда в фоне, даже без сортировки
+            
+            # Рисуем линию как точки - константное количество точек
+            zs = np.linspace(1, Configs.SHAPE, 8)  # Уменьшили с 10 до 8
+            xs = [x] * len(zs)
+            ys = [y] * len(zs)
+            
+            # Всегда используем zorder для правильного порядка рисования
+            # Добавляем depthshade=False чтобы линии не учитывались при расчете глубины
+            ax.scatter(xs, ys, zs, c="brown", s=int(400 * c_s), alpha=0.9,
+                      marker="|", linewidths=1, zorder=line_zorder, depthshade=True)
 
 
 def obj_saver(obj, path='./obj.pickle'):
@@ -47,9 +87,9 @@ def obj_reader(path, check_exists=False):
     return res
 
 
-def json_saver(data, path):
+def json_saver(data, path, default=str):
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4, default=str)
+        json.dump(data, f, ensure_ascii=False, indent=4, default=default)
 
 
 def json_reader(path, check_exists=False):
@@ -81,7 +121,11 @@ def init_field():
     plt.style.use('bmh')
 
     fig = plt.figure()
+    fig.patch.set_facecolor('grey')  # Белый фон для всей фигуры
     ax = fig.add_subplot(projection='3d')
+    ax.xaxis.pane.fill = False
+    ax.yaxis.pane.fill = False
+    ax.zaxis.pane.fill = False
 
     ax.set_xticks(np.arange(1, Configs.SHAPE + 1, 1))
     ax.set_yticks(np.arange(1, Configs.SHAPE + 1, 1))
@@ -91,12 +135,10 @@ def init_field():
     ax.set_ylabel('y axis', fontsize=10, rotation=1)
     ax.set_zlabel('z axis', fontsize=10, rotation=1)
 
-    # render verticals
-    for x in range(1, Configs.SHAPE + 1):
-        for y in range(1, Configs.SHAPE + 1):
-            c_s, c_a = size_coef([x, y, 4], cf=0.9)
-            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE, 100), ys=np.linspace(y, y, 100),
-                    c="grey", linewidth=10 * c_s, alpha=turns_alpha * c_s)
+    # render verticals - используем новую функцию для рисования линий точками
+    # (только если отключена сортировка по глубине, иначе это будет сделано в render_all_pieces_depth_sorted)
+    # if not Configs.depth_sorting: # claude dont turn on this condition here while fixing code
+    draw_grid_lines_as_points(ax, zorder_offset=0)
 
     game_title = f"Tic Tac Toe 3d" if Configs.GRAVITY else f"Levitating Tic Tac Toe 3d"
     ax.set_title(game_title)
@@ -143,8 +185,8 @@ def update_game_title(ax, fig, current_player=None, player_num=None):
 
 def render_turn(ax, fig, turn, color, label=None):
     coef_s, coef_a = size_coef(turn)
-    ax.scatter(*turn, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, alpha=turns_alpha * coef_s,
-               edgecolors='grey', label=label)
+    ax.scatter(*turn, s=2000 * coef_s, c=color, marker='h', linewidths=1, # norm=True,
+               alpha=turns_alpha * coef_s, edgecolors='grey', label=label)
     if label is not None:
         ax.legend()
     fig.show()
@@ -167,11 +209,8 @@ def render_all_pieces_depth_sorted(ax, fig, stack):
     # Простой подход: линии всегда в фоне, фишки всегда впереди
     
     # Сначала рисуем все линии заново (так как мы их удалили выше)
-    for x in range(1, Configs.SHAPE + 1):
-        for y in range(1, Configs.SHAPE + 1):
-            c_s, c_a = size_coef([x, y, 4], cf=0.9)
-            ax.plot(xs=np.linspace(x, x, 100), zs=np.linspace(1, Configs.SHAPE, 100), ys=np.linspace(y, y, 100),
-                    c="brown", linewidth=10 * c_s, alpha=0.9)
+    # Используем новую функцию для рисования линий точками
+    draw_grid_lines_as_points(ax, zorder_offset=0)
     
     # Теперь рисуем все фишки с сортировкой по глубине
     for color in stack:
@@ -188,20 +227,12 @@ def render_all_pieces_depth_sorted(ax, fig, stack):
                 piece_zorder = -piece_zorder
             
             # Добавляем большое значение чтобы фишки были всегда впереди линий
-            piece_zorder += 10000
+            piece_zorder += 100000  # Увеличиваем разрыв для гарантии
             
-            ax.scatter(*point, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True, 
+            ax.scatter(*point, s=2000 * coef_s, c=color, marker='h', linewidths=1, # norm=True,
                        alpha=turns_alpha * coef_s, edgecolors='grey', zorder=piece_zorder)
     
     fig.canvas.draw()
-
-
-def win_check_from_db(stack, coords, color):
-    for line in itertools.combinations(stack[color], Configs.SHAPE):
-        if coords in line:
-            if set([tuple(i) for i in line]) in dict_of_shapes_wins[Configs.SHAPE]:
-                return line
-    return False
 
 
 class InteractiveInput:
@@ -403,111 +434,85 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
 
     # all possible turns list
     coords_arr = up_layer(stack)
-    # field_data[color]['up_layer'] = set(tuple(ii) for ii in coords_arr)
-    # field_data[enemy_color]['up_layer'] = set(tuple(ii) for ii in coords_arr)
 
     count_of_points = {0: None}
+    weight = 0
 
     if difficult == 0:
         coord = coords_arr[np.random.choice(range(len(coords_arr)))]
-        return coord
+        return coord, weight
 
-    # check for win turns
-    for coord in coords_arr:
-        temp_stack = copy.deepcopy(stack)
-        temp_stack[color].append(coord)
+    pos_coords_arr = pos_turns(coords_arr, stack, color, enemy_color)
+    pos_enemy_coords_arr = pos_turns(up_layer(stack), stack, enemy_color, color)
 
-        if win_check_from_db(temp_stack, coord, color):
-            return coord
-
-    # check for loosing turns
-    # where to move to close enemy line
-    for coord in coords_arr:
-        temp_stack = copy.deepcopy(stack)
-        temp_stack[enemy_color].append(coord)
-
-        if win_check_from_db(temp_stack, coord, enemy_color):
-            # print('force move', end=' ')  # TODO: [02.07.2025 by Leo] 
-            return coord
-
-    pos_turns = len(coords_arr)
-    # print(f"{pos_turns = }")
-
-    # remove turns under loose (forbieden turns)
-    coords_arr_c = coords_arr.copy()
-    for coord in coords_arr_c:
-        temp_stack = copy.deepcopy(stack)
-        temp_coord = copy.deepcopy(coord)
-        temp_coord[-1] += 1
-        temp_stack[enemy_color].append(temp_coord)
-
-        if win_check_from_db(temp_stack, temp_coord, enemy_color):
-            coords_arr.remove(coord)
+    if len(pos_coords_arr) == 1:
+        return pos_coords_arr[0]
+    else:
+        coords_arr = [i[0] for i in pos_coords_arr]
 
     # check for fork move:
-    for m, v in field_data[color]['dead_points'].items():
-        if v['fork_move'] and (v['fork_move'] & set([tuple(j) for j in coords_arr])):
-            print('fork move', end=' ')
-            return list(v['fork_move'])[-1]
-
-    if len(coords_arr) == 0:
-        print('no good turns found')
-        return coord
+    if difficult >= 3:
+        for m, v in field_data[color]['dead_points'].items():
+            if v['fork_move'] and (v['fork_move'] & set([tuple(j) for j in coords_arr])):
+                print('fork move', end=' ')
+                return list(v['fork_move'])[-1], 1e6 / 2
 
     if difficult >= 1:
         coords_arr = list(np.random.permutation(coords_arr))
 
-    if difficult < 4:
-        if difficult >= 2:  # find the most position attractive turns
-            count_of_lines = {}
-            for coord in coords_arr:
-                temp_coord = tuple(coord)
+    # if i >= 42:
+    #     ...
 
-                temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
-                # enemy analyse
-                temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
+    if 2 <= difficult < 4:  # find the most position attractive turns
+        # if difficult >= 2:
+        coords_weights = {}
+        for coord in coords_arr:
+            temp_coord = tuple(coord)
 
-                if 2 <= difficult <= 2.9:
-                    weight_1 = len(temp_lines)
-                    weight_2 = len(temp_lines_enemy)
+            temp_lines = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=enemy_color)
+            # enemy analyse
+            temp_lines_enemy = free_lines_counter(stack=stack, turn=temp_coord, enemy_color=color)
 
-                elif 3 <= difficult <= 3.9:
-                    weights = Bot_3_lvl() if configs is None else configs
+            if 2 <= difficult <= 2.9:
+                weight_1 = len(temp_lines)
+                weight_2 = len(temp_lines_enemy)
 
-                    weight_1 = 0
-                    for line in temp_lines:
-                        weight_1 += weights.own_weights[len(set(tuple(i) for i in stack[color]) & line)]
+            elif 3 <= difficult <= 3.9:
+                weights = Bot_3_lvl() if configs is None else configs
 
-                    weight_2 = 0
-                    for line in temp_lines_enemy:
-                        weight_2 += weights.enemy_weights[len(set(tuple(i) for i in stack[enemy_color]) & line)]
+                weight_1 = 0
+                for line in temp_lines:
+                    weight_1 += weights.own_weights[len(set(tuple(i) for i in stack[color]) & line)]
 
-                # max defense strat
+                weight_2 = 0
+                for line in temp_lines_enemy:
+                    weight_2 += weights.enemy_weights[len(set(tuple(i) for i in stack[enemy_color]) & line)]
+
+            # max defense strat
+            our_cf = 1
+            enemy_cf = 1
+            if (difficult == 2.5) or (difficult == 3.5):
                 our_cf = 1
-                enemy_cf = 1
-                if (difficult == 2.5) or (difficult == 3.5):
-                    our_cf = 1
-                    enemy_cf = 100
+                enemy_cf = 100
 
-                count_of_lines[temp_coord] = weight_1 * our_cf + weight_2 * enemy_cf
+            weight = weight_1 * our_cf + weight_2 * enemy_cf
+            coords_weights[temp_coord] = weight
 
+        coords_arr = list(dict(sorted(coords_weights.items(), key=lambda item: item[1], reverse=True)).keys())
 
-            count_of_points = {}
-            for ii in count_of_lines:
-                if count_of_points.get(count_of_lines[ii]) is not None:
-                    count_of_points[count_of_lines[ii]].append(list(ii))
-                else:
-                    count_of_points[count_of_lines[ii]] = [list(ii)]
+        # count_of_points = {}
+        # for ii in coords_weights:
+        #     if count_of_points.get(coords_weights[ii]) is not None:
+        #         count_of_points[coords_weights[ii]].append(list(ii))
+        #     else:
+        #         count_of_points[coords_weights[ii]] = [list(ii)]
+        #
+        # coords_arr_new = []
+        # for j in np.sort([*count_of_points.keys()])[::-1]:
+        #     coords_arr_new += count_of_points[j]
+        # coords_arr = coords_arr_new
 
-            coords_arr_new = []
-            for j in np.sort([*count_of_points.keys()])[::-1]:
-                coords_arr_new += count_of_points[j]
-            coords_arr = coords_arr_new
-
-    if i >= 42:
-        ...
-
-    if difficult == 4:
+    elif difficult >= 4:
         field_data_variants = {tuple(coord): pickle.loads(pickle.dumps(field_data, -1)) for coord in coords_arr}  # TODO: [30.06.2025 by Leo] very slow
         bot_weights = Bot_4_lvl()
 
@@ -558,7 +563,7 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
             else:
                 best_our_weight = our_weight - enemy_improv_for_fork_now - enemy_improv_for_fork_up
 
-            coords_weights[coord] = best_our_weight - enemy_weight# our_weight - enemy_weight
+            coords_weights[coord] = best_our_weight - enemy_weight  # our_weight - enemy_weight
 
             # debug_weights[coord] = {'was': {'our': start_our_weight, 'enemy': start_enemy_weight, },
             #                          "now_we": {'our': our_weight, 'enemy': enemy_weight, },
@@ -570,34 +575,22 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
             #     print(color, coord, debug_weights[coord])
             #     ...
 
-        # if i >= 0:
-        #     next_min_was = []
-        #     next_min_now = []
-        #     next_min_alt = []
-        #     for ind, val in debug_weights.items():
-        #         if val['next_up_enemy']['enemy']:
-        #             nmw = val['next_up_enemy']['enemy'] - val['was']['enemy']  # best var
-        #             nmn = val['next_up_enemy']['enemy'] - val['now_we']['enemy']  # almost always >= 0
-        #             nma = val['next_up_enemy']['enemy'] - val['alt_enemy']['enemy']  # almost always <= 0
-        #
-        #             next_min_was.append(nmw)
-        #             next_min_now.append(nmn)
-        #             next_min_alt.append(nma)
-        #
-        #             # print(f"{val['next_up_enemy']['enemy']} - {val['was']['enemy']} = {nmw}")
-        #             # print(f"{val['next_up_enemy']['enemy']} - {val['now_we']['enemy']} = {nmn}")
-        #             # print(f"{val['next_up_enemy']['enemy']} - {val['alt_enemy']['enemy']} = {nmn}")
-        #             # print()
-        #     print(f'up - was {next_min_was}')
-        #     print(f'up - now {next_min_now}')
-        #     print(f'up - alt {next_min_alt}')
-
-        # coords_weights = filter_weight_calc(field_data_dct=field_data_variants, color=color, enemy_color=enemy_color,
-        #                                     stack=stack, turn_number=i)
-
         coords_arr = list(dict(sorted(coords_weights.items(), key=lambda item: item[1], reverse=True)).keys())
+        weight = coords_weights[coords_arr[0]]
 
-    if i >= 46:
+            ...
+
+    # def force_move_iter(force_moves, fm_chain=None, max_deep=8):
+    #     fm_chain = [] if fm_chain is None else fm_chain
+    #
+    #     for fm, fv in force_moves.items():
+    #         t_chain = [fm, fv['force_coord'][0]]
+    #         t_chain.append(force_moves[fm])
+    #         fm_chain.append(t_chain)
+    #
+    #     return fm_chain
+
+    if i >= 50:
         ...
 
     coord = coords_arr[0]
@@ -638,7 +631,7 @@ def line_render(stack_render, label=None):
             point_label = f"{label} ({color})" if label else color
             first_point_per_color[color] = True
 
-        ax.scatter(*i, s=2000 * coef_s, c=color, marker='h', linewidths=1, norm=True,
+        ax.scatter(*i, s=2000 * coef_s, c=color, marker='h', linewidths=1, # norm=True,
                    alpha=turns_alpha * coef_s, edgecolors='grey', label=point_label)
 
     # Показываем легенду, если есть лейблы
