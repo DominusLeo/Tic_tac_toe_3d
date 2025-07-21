@@ -85,7 +85,7 @@ def up_layer(stack, return_tuple=False):
 
 
 def filter_lines_stack(orig_lines_set, coord, my_turn=True, bot_weights=Bot_4_lvl(), stack=None,):
-    # new_lines_set =  deepcopy({k: deepcopy(v) for k, v in orig_lines_set.items()})
+    # new_lines_set = deepcopy({k: deepcopy(v) for k, v in orig_lines_set.items()})
     new_lines_set = pickle.loads(pickle.dumps(orig_lines_set, -1))
 
     pop_lst = []
@@ -95,6 +95,9 @@ def filter_lines_stack(orig_lines_set, coord, my_turn=True, bot_weights=Bot_4_lv
             if my_turn:
                 new_lines_set[line]['points'].append(coord)
                 new_lines_set[line]['weight'] = bot_weights.diff_line_weights(line, new_lines_set[line]['points'], stack)
+                new_lines_set[line]['points_left'].remove(coord)
+                if coord in new_lines_set[line]['3rd_points']:
+                    new_lines_set[line]['3rd_points'].remove(coord)
             else:
                 pop_lst.append(line)
 
@@ -279,19 +282,75 @@ def find_dead_points(our_lines_dct, enemy_lines_dct, coord=None, color=None, sta
                 v['type'] = 'own'
                 v['weight'] = bot_weights.own_3rd_dead_point
 
+    # Dead points scoring system with scenario analysis
+    com_points = [i for i, v in enemy_dead_points.items() if v['type'] in ['com']]
+    third_com_points = [dp for dp in com_points if dp[2] == 3]
+    
+    # Count OWN points for both players on 3rd level
+    our_own_points = len([dp for dp in our_dead_points.keys() if our_dead_points[dp]['type'] == 'own' and dp[2] == 3])
+    enemy_own_points = len([dp for dp in enemy_dead_points.keys() if enemy_dead_points[dp]['type'] == 'own' and dp[2] == 3])
+    com_count = len(third_com_points)
+    
+    own_points_diff = our_own_points - enemy_own_points
+    # Calculate weights for COM dead points based on scenario analysis
+    if com_count > 0:
+        if own_points_diff > 0:
+            com_points_weight = bot_weights.common_3rd_dead_point
+        elif own_points_diff < 0:
+            com_points_weight = -bot_weights.common_3rd_dead_point
+        else:
+            com_points_weight = bot_weights.common_3rd_dead_point if (turn_num % 2) != (len(com_points) % 2) else -bot_weights.common_3rd_dead_point
 
-    com_points = [i for i, v in enemy_dead_points.items() if v['type'] == 'com']
-    if len(com_points):
-        com_points_weight = bot_weights.common_3rd_dead_point / len(com_points) if (turn_num % 2) != (len(com_points) % 2) \
-            else -bot_weights.common_3rd_dead_point / len(com_points)
+        # # Current player wants odd count (1st player) or even count (2nd player)
+        # current_player_wants_odd = (turn_num % 2 == 0)
+        #
+        # # Analyze all possible scenarios
+        # scenario_nobody_closes = com_count + our_own_points + enemy_own_points
+        #
+        # scenario_both_close = com_count
+        # scenario_only_we_close = com_count + enemy_own_points
+        # scenario_only_enemy_closes = com_count + our_own_points
+        #
+        # # Check if each scenario gives us the parity we want
+        # scenarios = [scenario_nobody_closes, scenario_both_close, scenario_only_we_close, scenario_only_enemy_closes]
+        # good_scenarios = sum(1 for s in scenarios if (s % 2 == 1) == current_player_wants_odd)
+        #
+        # # Evaluate COM points based on scenario outcomes
+        # if good_scenarios == 4:
+        #     # All scenarios good - COM points are excellent
+        #     com_points_weight = bot_weights.common_3rd_dead_point #/ com_count
+        # elif good_scenarios == 0:
+        #     # All scenarios bad - COM points are terrible
+        #     com_points_weight = -bot_weights.common_3rd_dead_point #/ com_count
+        # else:
+        #     # Mixed scenarios - evaluate based on control (who has more OWN points)
+        #     if our_own_points > enemy_own_points:
+        #         # We have more control - COM points are good
+        #         com_points_weight = bot_weights.common_3rd_dead_point #/ com_count * 0.5
+        #     elif our_own_points < enemy_own_points:
+        #         # Enemy has more control - COM points are bad
+        #         com_points_weight = -bot_weights.common_3rd_dead_point #/ com_count * 0.5
+        #     else:
+        #         # Equal control - evaluate based on current state
+        #         current_total = com_count + our_own_points + enemy_own_points
+        #         if (current_total % 2 == 1) == current_player_wants_odd:
+        #             com_points_weight = bot_weights.common_3rd_dead_point #/ com_count * 0.3
+        #         else:
+        #             com_points_weight = -bot_weights.common_3rd_dead_point / com_count * 0.3
     else:
         com_points_weight = 0
 
-
-    for dp in com_points:
-        our_dead_points[dp]['weight'] = com_points_weight
-        enemy_dead_points[dp]['weight'] = -com_points_weight
-        ...
+    # Apply weights to COM points
+    for dp in third_com_points:
+        if dp in our_dead_points:
+            our_dead_points[dp]['weight'] = com_points_weight
+        if dp in enemy_dead_points:
+            enemy_dead_points[dp]['weight'] = -com_points_weight
+            
+    # OWN points are always valuable as they give us control
+    third_own_points = [dp for dp in our_dead_points.keys() if our_dead_points[dp]['type'] == 'own' and dp[2] == 3]
+    for dp in third_own_points:
+        our_dead_points[dp]['weight'] = bot_weights.own_3rd_dead_point
 
     return our_dead_points, enemy_dead_points
 # ___________________________________________________________
@@ -311,6 +370,9 @@ def filter_cross_forks_stack(coord, my_turn=True, field_data=None, color=None, e
         if (coord in cross_fork[0]) or (coord in cross_fork[1]):
             if my_turn:
                 points.append(coord)
+                if coord in new_cross_forks_set[cross_fork]['points_left']:
+                    new_cross_forks_set[cross_fork]['points_left'].remove(coord)
+
                 if ((len(set(points) & cross_fork[0]) == 3) or (len(set(points) & cross_fork[1]) == 3)) \
                         and (com_point not in points):
                     bad_fork_logs['bad_one_line_cross_fork'][cross_fork] = points
@@ -371,6 +433,8 @@ def filter_over_forks_stack(coord, my_turn=True, color=None, enemy_color=None,  
         if (coord in over_fork[0]) or (coord in over_fork[1]):
             if my_turn:
                 points.append(coord)
+                if coord in new_over_forks_set[over_fork]['points_left']:
+                    new_over_forks_set[over_fork]['points_left'].remove(coord)
 
                 # if dead points under fork_points
                 ...
@@ -382,6 +446,8 @@ def filter_over_forks_stack(coord, my_turn=True, color=None, enemy_color=None,  
                         bad_fork_logs['bad_over_fork'][over_fork] = points
                         pop_lst.append(over_fork)
                     else:
+                        new_over_forks_set[over_fork]['fork_points'] = d_p
+
                         fork_logs['over_fork'][over_fork] = points
                         # TODO: [30.06.2025 by Leo] need we extra weight calcs for closed fork?
                         if (len(d_p) == 1) and (len((over_fork[0] | over_fork[1]) - set(points)) == 2) \
@@ -398,6 +464,7 @@ def filter_over_forks_stack(coord, my_turn=True, color=None, enemy_color=None,  
         new_over_forks_set.pop(p)
 
     return new_over_forks_set
+
 
 def filter_over_cross_forks_stack(orig_over_cross_forks_set, coord, my_turn=True,  field_data=None, stack=None, bot_weights=Bot_4_lvl()):
     return
@@ -448,10 +515,70 @@ def full_data_update(temp_field_data, coord, color, enemy_color, stack, turn_num
     stack[color].append(list(coord))
 
 
-def build_chains(fm_dct, new_field_data, turn_num, new_stack, cur_color, cur_enemy_color, bot_weights=Bot_5_lvl(), comment=''):
+build_chains_stack_cash = {}
+new_fd_cash_counter = {'count_imp': 0, 'count_fm': 0}
+
+def build_chains(fm_dct, new_field_data, turn_num, new_stack, cur_color, cur_enemy_color, bot_weights=Bot_5_lvl(),
+                   comment='', cash=None, stack_cash=True):
     chains = []
 
-    def dfs(current_fd, chain, turn_num, up_field_data, up_stack, our_w_diff=0, enemy_w_diff=0, comment=comment):
+    def dfs(current_fd, chain, turn_num, up_field_data, up_stack, our_w_diff=0, enemy_w_diff=0, comment=comment, ):
+        ck1 = list(up_stack.keys())[0]
+        ck2 = list(up_stack.keys())[1]
+
+        if stack_cash:
+            set_k1 = frozenset([tuple(j) for j in up_stack[ck1]])
+            set_k2 = frozenset([tuple(j) for j in up_stack[ck2]])
+
+            if (set_k1, set_k2, cur_color) not in build_chains_stack_cash:
+                pos_turns_arr = pos_turns(up_layer(up_stack, return_tuple=False), up_stack, cur_color, cur_enemy_color)
+                coords_arr = [tuple(i[0]) for i in pos_turns_arr]
+
+                our_alt_imp_turns = imp_coords_finder(up_field_data, cur_color, coords_arr, up_stack, cur_enemy_color)
+
+                build_chains_stack_cash[(set_k1, set_k2, cur_color)] = [coords_arr, our_alt_imp_turns]
+            else:
+                coords_arr, our_alt_imp_turns = build_chains_stack_cash[(set_k1, set_k2, cur_color)]
+        else:
+            pos_turns_arr = pos_turns(up_layer(up_stack, return_tuple=False), up_stack, cur_color, cur_enemy_color)
+            coords_arr = [tuple(i[0]) for i in pos_turns_arr]
+
+            our_alt_imp_turns = imp_coords_finder(up_field_data, cur_color, coords_arr, up_stack, cur_enemy_color)
+
+        if len(our_alt_imp_turns):
+            alt_turns = []
+            for alt_coord in our_alt_imp_turns:
+                new_fd = pickle.loads(pickle.dumps(up_field_data, -1))
+                new_st = pickle.loads(pickle.dumps(up_stack, -1))
+
+                our_weights0 = weight_calc(new_fd, cur_color, )
+                enemy_weights0 = weight_calc(new_fd, cur_enemy_color, )
+
+                next_chain = [tuple(j)[0] for j in chain] + [alt_coord]
+
+                if (cash is not None) and (tuple(next_chain) in cash):
+                    # new_fd_cash_counter['count_imp'] += 1
+                    weight1, _, our_diff, enemy_diff, new_fd, new_st = cash[tuple(next_chain)]
+                else:
+                    full_data_update(new_fd, alt_coord, cur_color, cur_enemy_color, stack=new_st, turn_num=turn_num)
+
+                    our_weights1 = weight_calc(new_fd, cur_color, )
+                    enemy_weights1 = weight_calc(new_fd, cur_enemy_color, )
+                    weight1 = our_weights1 - enemy_weights1
+
+                    our_diff = our_weights1 - our_weights0
+                    enemy_diff = enemy_weights1 - enemy_weights0
+
+                    if cash is not None:
+                        cash[tuple(next_chain)] = [weight1, 0, our_diff, enemy_diff, new_fd, new_st]
+
+                if (our_diff >= bot_weights.th_points // 1e5) or (enemy_diff >= bot_weights.th_points // 1e5):
+                    chains.append(chain + [(alt_coord, weight1), (None, None)])
+                    # alt_turns.append()
+
+            # chain.append(alt_turns)
+            # chain.append({None: None})
+
         # Depth-First Search
         # Базовый случай: если словарь пуст, сохраняем цепочку
         if not current_fd:
@@ -467,40 +594,45 @@ def build_chains(fm_dct, new_field_data, turn_num, new_stack, cur_color, cur_ene
             new_fd = pickle.loads(pickle.dumps(up_field_data, -1))
             new_st = pickle.loads(pickle.dumps(up_stack, -1))
 
-            pos_turns_arr = pos_turns(up_layer(up_stack, return_tuple=False), up_stack, cur_color, cur_enemy_color)
-            coords_arr = [tuple(i[0]) for i in pos_turns_arr]
-            # if len(pos_turns_arr) == 1:
-            #     next_fd = new_fd[cur_color]['force_moves']
-            #     next_fd.pop(k)
-            #     if chain and (chain not in chains):
-            #         dfs(next_fd, chain, turn_num, new_fd, new_st)
-
             our_weights0 = weight_calc(new_fd, cur_color, )
             enemy_weights0 = weight_calc(new_fd, cur_enemy_color, )
             start_weight0 = our_weights0 - enemy_weights0
 
-            if (k[0], k[1], k[2]) in coords_arr: # not in up_field_data[cur_enemy_color]['dead_points']:
-                # 2) Получим следующий словарь
-                full_data_update(new_fd, k, cur_color, cur_enemy_color, stack=new_st, turn_num=turn_num)
+            if (k[0], k[1], k[2]) in coords_arr:  # not in up_field_data[cur_enemy_color]['dead_points']:
 
-                our_weights1 = weight_calc(new_fd, cur_color, )
-                enemy_weights1 = weight_calc(new_fd, cur_enemy_color, )
-                weight1 = our_weights1 - enemy_weights1
+                next_chain = [tuple(j)[0] for j in chain] + [k] + [v['force_coord'][0]]
 
-                full_data_update(new_fd, v['force_coord'][0], cur_enemy_color, cur_color, stack=new_st, turn_num=turn_num + 1)
-                our_weights2 = weight_calc(new_fd, cur_color)
-                enemy_weights2 = weight_calc(new_fd, cur_enemy_color, )
-                weight2 = enemy_weights2 - our_weights2
+                new_fd_cash_counter['count_fm'] += 1
+                if (cash is not None) and (tuple(next_chain) in cash):
+                    weight1, weight2, our_diff, enemy_diff, new_fd, new_st = cash[tuple(next_chain)]
+                else:
+                    # 2) Получим следующий словарь
+                    full_data_update(new_fd, k, cur_color, cur_enemy_color, stack=new_st, turn_num=turn_num)
 
-                next_fd = new_fd[cur_color]['force_moves']  # transform(current_fd, k, v)
+                    our_weights1 = weight_calc(new_fd, cur_color, )
+                    enemy_weights1 = weight_calc(new_fd, cur_enemy_color, )
+                    weight1 = our_weights1 - enemy_weights1
+
+                    full_data_update(new_fd, v['force_coord'][0], cur_enemy_color, cur_color, stack=new_st,
+                                     turn_num=turn_num + 1)
+                    our_weights2 = weight_calc(new_fd, cur_color)
+                    enemy_weights2 = weight_calc(new_fd, cur_enemy_color, )
+                    weight2 = enemy_weights2 - our_weights2
+
+                    our_diff = our_weights2 - our_weights0
+                    enemy_diff = enemy_weights2 - enemy_weights0
+
+                    if cash is not None:
+                        cash[tuple(next_chain)] = [weight1, weight2, our_diff, enemy_diff, new_fd, new_st]
 
                 # 1) Запомним текущий шаг
-                chain.append({k: weight1})
-                chain.append({v['force_coord'][0]: weight2})
+                next_fd = new_fd[cur_color]['force_moves']  # transform(current_fd, k, v)
+                chain.append((k, weight1))
+                chain.append((v['force_coord'][0], weight2))
 
                 # 3) Спустимся глубже
                 dfs(next_fd, chain, turn_num + 2, new_fd, new_st, comment=comment,
-                    our_w_diff=our_weights2 - our_weights0, enemy_w_diff=enemy_weights2 - enemy_weights0)
+                    our_w_diff=our_diff, enemy_w_diff=enemy_diff)
 
                 # 4) Откатим изменения chain для следующей ветки
                 chain.pop()
@@ -518,3 +650,74 @@ def build_chains(fm_dct, new_field_data, turn_num, new_stack, cur_color, cur_ene
     # Запускаем обход
     dfs(fm_dct, [], turn_num, new_field_data, new_stack)
     return chains
+
+
+def imp_coords_finder(field_data, color, allow_turns=None, stack=None, enemy_color=None):
+    allow_turns = [tuple(i) for i in allow_turns]
+    last_points_to_comb = []
+    # coords_to_append = []
+    for k, v in field_data[color]['lines_left'].items():
+        if len(v['3rd_points']) and (len(v['points_left']) == 2):
+            coords_to_append = set(v['points_left']) - set(v['3rd_points'])
+            if len(coords_to_append):
+                if (v['3rd_points'][0] not in field_data[enemy_color]['dead_points']) \
+                        and (z_shift_point(v['3rd_points'][0], -1) not in field_data[enemy_color]['dead_points']):
+                    coords_to_append = list(coords_to_append)
+            else:
+                # p1, p2  = v['3rd_points']
+                # dp_chack = [i for i in v['3rd_points'] if i not in field_data[enemy_color]['dead_points']]
+                udp_chack = [i for i in v['3rd_points'] if z_shift_point(i, -1) not in field_data[enemy_color]['dead_points']]
+                if len(udp_chack) == 2:
+                    coords_to_append = v['3rd_points']
+
+            if not all([i in allow_turns for i in v['points_left']]):
+                last_points_to_comb += coords_to_append
+
+            # if all([i in allow_turns for i in v['points_left']]):
+            #     ...
+
+    for k, v in field_data[color]['cross_forks_left'].items():
+        if len(v['points_left']) == 1:
+            last_points_to_comb += v['points_left']
+
+    for k, v in field_data[color]['over_forks_left'].items():
+        if len(v['fork_points']) == 1:
+            if len(v['points_left']) == 3:
+                pos_over_forks_move = list(set(v['points_left']) - v['fork_points'][0])
+                last_points_to_comb += pos_over_forks_move
+
+            elif len(v['points_left']) == 4:
+                if ((len(k[0] & set(v['points'])) == 3) and (len(k[1] & set(v['points'])) == 2)) \
+                        or ((len(k[1] & set(v['points'])) == 3) and (len(k[0] & set(v['points'])) == 2)):
+                    pos_over_forks_move = list(set(v['points_left']) - v['fork_points'][0])
+                    last_points_to_comb += pos_over_forks_move
+
+    if allow_turns is not None:
+        return set(last_points_to_comb) & set(tuple(i) for i in allow_turns)
+    else:
+        return set(last_points_to_comb)
+
+
+def dangerous_chains_extractor(init_chains, bot_weights, just_moves=False):
+    dang_chains = {} if just_moves else []
+    for chain in init_chains:
+        for ind, t in enumerate(chain[::2]):
+            # if isinstance(t, dict):
+            if t[1] >= bot_weights.th_points:
+                if just_moves:
+                    if t[1] in dang_chains:
+                        if tuple(j[0] for j in chain[::2]) not in dang_chains[t[1]]:
+                            dang_chains[t[1]].append(tuple(j[0] for j in chain[::2]))
+                    else:
+                        dang_chains[t[1]] = [tuple(j[0] for j in chain[::2])]
+                else:
+                    dang_chains.append((chain[::2], t[1]))
+                break
+
+            # elif isinstance(t, list):
+            #     for tt in t:
+            #         if list(tt.items())[0][1] >= bot_weights.th_points:
+            #             chain[ind * 2] = tt
+            #             dang_chains.append((chain[::2], list(tt.items())[0][1]))
+            #             break
+    return dang_chains

@@ -2,7 +2,8 @@ import copy
 from tqdm import trange
 import pickle
 
-from bot_utils import bad_fork_logs, fork_logs, full_data_update, weight_calc, win_check_from_db
+from bot_utils import bad_fork_logs, fork_logs, full_data_update, weight_calc, win_check_from_db, imp_coords_finder, \
+    pos_turns
 from constants import Configs, DIMENSION, Bot_4_lvl
 from funcs import init_field, input_coords, render_turn, line_render, bot_turn, \
     leader_bord_stat, obj_saver, obj_reader, up_layer, update_game_title, render_all_pieces_depth_sorted, json_saver, \
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     test_by_ready_game = False
     start_turn_num = 96 if test_by_ready_game else 0
 
-    to_save_res_name = 'test_data/test_game_log_n.pickle'
+    Configs.random_seed = None # 43 # 41
 
     Configs.debug_mod = False  # random turns by pc without players decisions
     Configs.second_bot = 3     # 0, 1, 2 - difficult of second bot

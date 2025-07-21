@@ -13,7 +13,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from tqdm import tqdm
 import datetime as dt
 
-from bot_utils import full_data_update, weight_calc, up_layer, build_chains, pos_turns
+from bot_utils import full_data_update, weight_calc, up_layer, build_chains, pos_turns, imp_coords_finder, \
+    new_fd_cash_counter, dangerous_chains_extractor
 from constants import Configs, DIMENSION, dict_of_shapes_wins, Bot_3_lvl, turns_alpha, Bot_4_lvl, need_size_cf, \
     Bot_5_lvl
 from utils import free_lines_counter, gravity_correction, debug_turn
@@ -439,11 +440,14 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
     weight = 0
 
     if difficult == 0:
+        if Configs.random_seed is not None:
+            np.random.seed(Configs.random_seed)
         coord = coords_arr[np.random.choice(range(len(coords_arr)))]
         return coord, weight
 
     pos_coords_arr = pos_turns(coords_arr, stack, color, enemy_color)
     pos_enemy_coords_arr = pos_turns(up_layer(stack), stack, enemy_color, color)
+    enemy_coords_arr = [i[0] for i in pos_enemy_coords_arr]
 
     if len(pos_coords_arr) == 1:
         return pos_coords_arr[0]
@@ -458,6 +462,8 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
                 return list(v['fork_move'])[-1], 1e6 / 2
 
     if difficult >= 1:
+        if Configs.random_seed is not None:
+            np.random.seed(Configs.random_seed)
         coords_arr = list(np.random.permutation(coords_arr))
 
     # if i >= 42:
@@ -500,24 +506,21 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
 
         coords_arr = list(dict(sorted(coords_weights.items(), key=lambda item: item[1], reverse=True)).keys())
 
-        # count_of_points = {}
-        # for ii in coords_weights:
-        #     if count_of_points.get(coords_weights[ii]) is not None:
-        #         count_of_points[coords_weights[ii]].append(list(ii))
-        #     else:
-        #         count_of_points[coords_weights[ii]] = [list(ii)]
-        #
-        # coords_arr_new = []
-        # for j in np.sort([*count_of_points.keys()])[::-1]:
-        #     coords_arr_new += count_of_points[j]
-        # coords_arr = coords_arr_new
-
     elif difficult >= 4:
         field_data_variants = {tuple(coord): pickle.loads(pickle.dumps(field_data, -1)) for coord in coords_arr}  # TODO: [30.06.2025 by Leo] very slow
         bot_weights = Bot_4_lvl()
 
         debug_weights = {}
         coords_weights = {}
+
+        # weights before turn
+        start_our_weight = weight_calc(field_data, color, )
+        start_enemy_weight = weight_calc(field_data, enemy_color, )   # best comp for next up
+
+        enemy_good_turns_now = imp_coords_finder(field_data, enemy_color, enemy_coords_arr, stack, enemy_color=color)
+        if len(enemy_good_turns_now):
+            ...
+
         for coord in coords_arr:
             coord = tuple(coord)
             temp_field_data = field_data_variants[coord]
@@ -525,10 +528,6 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
 
             copy_stack = pickle.loads(pickle.dumps(stack, -1))
             enemy_copy_stack = pickle.loads(pickle.dumps(stack, -1))
-
-            # weights before turn
-            start_our_weight = weight_calc(temp_field_data, color, )
-            start_enemy_weight = weight_calc(temp_field_data, enemy_color, )   # best comp for next up
 
             # weights for our turn now
             full_data_update(temp_field_data, coord, color, enemy_color, copy_stack, turn_num=i, bot_weights=bot_weights, comment='our cur turn')
@@ -578,7 +577,39 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
         coords_arr = list(dict(sorted(coords_weights.items(), key=lambda item: item[1], reverse=True)).keys())
         weight = coords_weights[coords_arr[0]]
 
-            ...
+    if difficult >= 5:
+        # from timeout_monitor import with_timeout
+        bot_weights = Bot_5_lvl()
+
+        # temp_field_data = pickle.loads(pickle.dumps(field_data, -1))
+        temp_our_fm = copy.deepcopy(field_data[color]['force_moves'])
+        temp_enemy_fm = copy.deepcopy(field_data[enemy_color]['force_moves'])
+
+        # our_pos = [tuple(j[0]) for j in pos_coords_arr]
+        if len(temp_our_fm) >= 1:
+            our_cash_dct = None
+            # with with_timeout(10, debug_on_timeout=True):
+            our_chains = build_chains(temp_our_fm, field_data, turn_num=i, new_stack=stack, cur_color=color, cur_enemy_color=enemy_color, comment='our', cash=our_cash_dct)
+
+            if len(our_chains):
+                our_dang_chains = dangerous_chains_extractor(our_chains, bot_weights, True)
+                if len(our_dang_chains):
+                    # our_dct_dang_chain = dict([j[::-1] for j in our_dang_chains])
+                    # print(our_dang_chains)
+                    ...
+
+        # enemy_pos = [tuple(j[0]) for j in pos_enemy_coords_arr]
+        if len(temp_enemy_fm) >= 1:
+            enemy_cash_dct = None
+            # with with_timeout(10, debug_on_timeout=True):
+            enemy_chains = build_chains(temp_enemy_fm, field_data, turn_num=i + 1, new_stack=stack, cur_color=enemy_color, cur_enemy_color=color, comment='enemy', cash=enemy_cash_dct)
+
+            if len(enemy_chains):
+                enemy_dang_chains = dangerous_chains_extractor(enemy_chains, bot_weights, True)
+                if len(enemy_dang_chains):
+                    # print(enemy_dang_chains)
+                    # enemy_dct_dang_chain = dict([j[::-1] for j in enemy_dang_chains])
+                    ...
 
     # def force_move_iter(force_moves, fm_chain=None, max_deep=8):
     #     fm_chain = [] if fm_chain is None else fm_chain
@@ -596,11 +627,13 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
     coord = coords_arr[0]
     # _________________________________________
 
-    return coord
+    return coord, weight
 
 
-def line_render(stack_render, label=None):
-    fig, ax = init_field()
+def line_render(stack_render, label=None, fig=None, ax=None):
+
+    if (fig is None) or (ax is None):
+        fig, ax = init_field()
 
     # Флаг для отслеживания первой точки каждого цвета
     first_point_per_color = {}

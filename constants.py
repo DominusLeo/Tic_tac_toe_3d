@@ -4,7 +4,7 @@ DIMENSION = 3
 turns_alpha = 0.9
 need_size_cf = False
 
-def create_intersecting_lines_dict():
+def create_intersecting_lines_dict(skip_vertical_cross=True, delete_4th_cross=True):
     """
     Создает словарь пар линий, которые пересекаются в одной точке,
     аналогично dict_of_shapes_wins, но вместо отдельных линий - пары пересекающихся линий.
@@ -25,10 +25,19 @@ def create_intersecting_lines_dict():
                 line2 = lines_list[j]
 
                 # Находим пересечение двух линий (общие точки)
-                intersection = line1 & line2
+                intersection = list(line1 & line2)
 
                 # Если линии пересекаются ровно в одной точке
                 if len(intersection) == 1:
+                    if delete_4th_cross:
+                        if intersection[0][2] == 4:
+                            under_intersection = (intersection[0][0], intersection[0][1], intersection[0][2] - 1)
+                            if (under_intersection in line1) or (under_intersection in line2):
+                               continue
+                    if skip_vertical_cross:
+                        if (set([x1[0] for x1 in line1]) == set([x2[0] for x2 in line2])) \
+                                and (set([y1[1] for y1 in line1]) == set([y2[1] for y2 in line2])):
+                            continue
                     intersecting_pairs.append((line1, line2))
 
         dict_of_intersecting_lines[shape_size] = intersecting_pairs
@@ -223,32 +232,39 @@ class Configs:
     reverse_depth = False     # True - reverse depth sorting (further objects in front)
     sort_all_axes = True      # True - sort by all coordinates (x,y,z), False - sort only by z
 
+    random_seed = None
+
     stack = {'red': [], "green": []}  # set color and name for every player, used by matplotlib
 
     field_data = {
         'fst_player': {
             'up_layer': set(),
-            'lines_left': {i: {'weight': 1, 'points': []} for i in deepcopy(dict_of_shapes_wins[SHAPE])},
-            'cross_forks_left': {i: {'weight': 1, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': []}
+            'lines_left': {i: {'weight': 1, 'points': [], 'points_left': list(i), '3rd_points': [j for j in i if j[2] == 3]}
+                           for i in deepcopy(dict_of_shapes_wins[SHAPE])},
+            'cross_forks_left': {i: {'weight': 1, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': [],
+                                     'points_left': list((i[0] | i[1]) - (i[0] & i[1]))}
                                  for i in deepcopy(dict_of_intersecting_lines_cross[SHAPE])},
-            'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i)}
+            'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i), 'points_left': list((i[0] | i[1]))}
                                 for i in deepcopy(dict_of_adjacent_z_intersecting_lines_cross[SHAPE])}
 ,
             'dead_points': {},  # {coord: {value: tuple, type: str, weight: int, 'fork_move': tuple, 'under_slots': list, 'layer': int}}
             'force_moves': {},
         },
-        "snd_player": {
-            'up_layer': set(),
-            'lines_left': {i: {'weight': 1, 'points': []} for i in deepcopy(dict_of_shapes_wins[SHAPE])},
-            'cross_forks_left': {i: {'weight': 1, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': []}
-                                 for i in deepcopy(dict_of_intersecting_lines_cross[SHAPE])},
-            'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i)}
-                                for i in deepcopy(dict_of_adjacent_z_intersecting_lines_cross[SHAPE])},
-            'dead_points': {},
-            'force_moves': {},
-        }
     }
+    field_data['snd_player'] = deepcopy(field_data['fst_player'])
 
+    # "snd_player": {
+    #     'up_layer': set(),
+    #     'lines_left': {i: {'weight': 1, 'points': [], 'points_left': list(i)}
+    #                    for i in deepcopy(dict_of_shapes_wins[SHAPE])},
+    #     'cross_forks_left': {i: {'weight': 1, 'points': [], 'common_point': list(i[0] & i[1])[0], 'final_pair': [],
+    #                              'points_left': list((i[0] | i[1]) - (i[0] & i[1]))}
+    #                          for i in deepcopy(dict_of_intersecting_lines_cross[SHAPE])},
+    #     'over_forks_left': {i: {'weight': 1, 'points': [], 'fork_points': get_fork_points(i), 'points_left': list((i[0] | i[1]))}
+    #                         for i in deepcopy(dict_of_adjacent_z_intersecting_lines_cross[SHAPE])},
+    #     'dead_points': {},
+    #     'force_moves': {},
+    # }
 
 class Bot_3_lvl:
     def __init__(self):
@@ -296,7 +312,7 @@ class Bot_4_lvl:
         """
         self.fork_weights = {
             0:1,
-            1:2,  # 20
+            1:5,  # 20
             2:30,
             3:40,
             4:5,
