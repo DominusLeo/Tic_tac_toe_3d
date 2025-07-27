@@ -57,8 +57,8 @@ if __name__ == "__main__":
     else:
         print(f"{bot_1_configs.name} VS const_{hz.bot_difficult}_lvl_bot")
 
-
     for trying in trange(20):
+        hz.random_seed = np.random.randint(100_000)
         color, i, is_win = single_game(rendering=render, bot_2_configs=None, bot_1_configs=bot_1_configs,
                                        Configs=hz, stack_weights_to_save={fst_color: [], snd_color: []})
         win_stat[color].append(i) if is_win else win_stat['nobody'].append(i)
@@ -66,6 +66,7 @@ if __name__ == "__main__":
     hz.stack = {snd_color: [], fst_color: []}
     hz.play_vs_bot = 2
     for trying in trange(20):
+        hz.random_seed = np.random.randint(100_000)
         color, i, is_win = single_game(rendering=render, bot_2_configs=None, bot_1_configs=bot_1_configs,
                                        Configs=hz, stack_weights_to_save={snd_color: [], fst_color: []})
         win_stat[color].append(i) if is_win else win_stat['nobody'].append(i)

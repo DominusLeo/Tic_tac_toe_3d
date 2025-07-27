@@ -47,6 +47,7 @@ def pos_turns(coords_arr, stack, color, enemy_color):
 
     # remove turns under loose (forbieden turns)
     coords_arr_c = coords_arr.copy()
+    coord = [-1, -1, -1] # TODO: [23.07.2025 by Leo] fix for last turn in game
     for coord in coords_arr_c:
         temp_stack = pickle.loads(pickle.dumps(stack, -1))
         temp_coord = deepcopy(coord)
@@ -700,24 +701,30 @@ def imp_coords_finder(field_data, color, allow_turns=None, stack=None, enemy_col
 
 def dangerous_chains_extractor(init_chains, bot_weights, just_moves=False):
     dang_chains = {} if just_moves else []
+    com_moves_counter = {}
+
     for chain in init_chains:
         for ind, t in enumerate(chain[::2]):
-            # if isinstance(t, dict):
             if t[1] >= bot_weights.th_points:
                 if just_moves:
                     if t[1] in dang_chains:
                         if tuple(j[0] for j in chain[::2]) not in dang_chains[t[1]]:
-                            dang_chains[t[1]].append(tuple(j[0] for j in chain[::2]))
+                            dang_chains[t[1]]['moves'].append(tuple(j[0] for j in chain[::1]))
+                            dang_chains[t[1]]['com_moves'] = set.intersection(*map(set, dang_chains[t[1]]['moves']))
+                            dang_chains[t[1]]['len'] = len(dang_chains[t[1]]['moves'][0])
+
                     else:
-                        dang_chains[t[1]] = [tuple(j[0] for j in chain[::2])]
+                        dang_chains[t[1]] = {'moves': [], 'com_moves': []}
+                        dang_chains[t[1]]['moves'] = [tuple(j[0] for j in chain[::1])]
+                        dang_chains[t[1]]['com_moves'] = set.intersection(*map(set, dang_chains[t[1]]['moves']))
+                        dang_chains[t[1]]['len'] = len(dang_chains[t[1]]['moves'][0])
                 else:
                     dang_chains.append((chain[::2], t[1]))
                 break
 
-            # elif isinstance(t, list):
-            #     for tt in t:
-            #         if list(tt.items())[0][1] >= bot_weights.th_points:
-            #             chain[ind * 2] = tt
-            #             dang_chains.append((chain[::2], list(tt.items())[0][1]))
-            #             break
-    return dang_chains
+    if just_moves:
+        dang_chains = dict(sorted(dang_chains.items(), key=lambda x: x[0], reverse=True))
+        com_moves = [j['com_moves'] for k, j in dang_chains.items()]
+        com_moves_counter = dict(sorted(Counter(itertools.chain.from_iterable(com_moves)).items(), key=lambda item: item[1], reverse=True))
+
+    return dang_chains, com_moves_counter

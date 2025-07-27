@@ -88,7 +88,10 @@ def obj_reader(path, check_exists=False):
     return res
 
 
-def json_saver(data, path, default=str):
+def json_saver(data, path, default=str, make_new_path=False,):
+    if not os.path.exists(os.path.dirname(path)) and make_new_path:
+        os.makedirs(os.path.dirname(path))
+
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4, default=default)
 
@@ -592,11 +595,24 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
             our_chains = build_chains(temp_our_fm, field_data, turn_num=i, new_stack=stack, cur_color=color, cur_enemy_color=enemy_color, comment='our', cash=our_cash_dct)
 
             if len(our_chains):
-                our_dang_chains = dangerous_chains_extractor(our_chains, bot_weights, True)
+                our_dang_chains, our_chains_counter = dangerous_chains_extractor(our_chains, bot_weights, True)
                 if len(our_dang_chains):
-                    # our_dct_dang_chain = dict([j[::-1] for j in our_dang_chains])
-                    # print(our_dang_chains)
-                    ...
+                    our_chains_weights = {k: {'count': v,
+                                              'len': min([vv['len'] for j, vv in our_dang_chains.items() if k in vv['com_moves']]),
+                                              'weight': bot_weights.round_to_const(max([j for j, vv in our_dang_chains.items() if k in vv['com_moves']])) -
+                                              min([vv['len'] for j, vv in our_dang_chains.items() if k in vv['com_moves']]),
+                                              } for k, v in our_chains_counter.items()}
+                    our_chains_weights = dict(sorted(our_chains_weights.items(), key=lambda x: x[1]['weight'], reverse=True))
+
+                    our_next_turns = {ind: v for ind, v in our_chains_weights.items() if (ind in coords_weights) and (ind in [j[0][0] for j in our_chains])}
+
+                    print(i, '- our:', our_next_turns)
+                    if len(our_next_turns):
+                        max_weight = list(our_next_turns.values())[0]['weight']
+                        for c in our_next_turns:
+                            if our_next_turns[c]['weight'] == max_weight:
+                                coords_weights[c] += our_next_turns[c]['weight']
+
 
         # enemy_pos = [tuple(j[0]) for j in pos_enemy_coords_arr]
         if len(temp_enemy_fm) >= 1:
@@ -605,12 +621,28 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
             enemy_chains = build_chains(temp_enemy_fm, field_data, turn_num=i + 1, new_stack=stack, cur_color=enemy_color, cur_enemy_color=color, comment='enemy', cash=enemy_cash_dct)
 
             if len(enemy_chains):
-                enemy_dang_chains = dangerous_chains_extractor(enemy_chains, bot_weights, True)
+                enemy_dang_chains, enemy_chains_counter = dangerous_chains_extractor(enemy_chains, bot_weights, True)
                 if len(enemy_dang_chains):
-                    # print(enemy_dang_chains)
-                    # enemy_dct_dang_chain = dict([j[::-1] for j in enemy_dang_chains])
-                    ...
+                    enemy_chains_weights = {k: {'count': v,
+                                                'weight': bot_weights.round_to_const(max([j for j, vv in enemy_dang_chains.items() if k in vv['com_moves']])) + v,
+                                                'len': min([vv['len'] for j, vv in enemy_dang_chains.items() if k in vv['com_moves']])}
+                                            for k, v in enemy_chains_counter.items()}
+                    enemy_chains_weights = dict(sorted(enemy_chains_weights.items(), key=lambda x: x[1]['weight'], reverse=True))
+                    enemy_next_turns = {ind: v for ind, v in enemy_chains_weights.items() if ind in coords_weights}
 
+                    print(i, '- enemy:', enemy_next_turns)
+                    # if len(enemy_next_turns):
+                    #     max_weight = list(enemy_next_turns.values())[0]['weight']
+                    #     for c in enemy_next_turns:
+                    #         if enemy_next_turns[c]['weight'] == max_weight:
+                    #             coords_weights[c] += enemy_next_turns[c]['weight']
+                    for c in coords_arr:
+                        if c in enemy_next_turns:
+                            coords_weights[c] += enemy_next_turns[c]['weight']
+                            break
+
+        coords_arr = list( dict(sorted(coords_weights.items(), key=lambda item: item[1], reverse=True)).keys())
+        weight = coords_weights[coords_arr[0]]
     # def force_move_iter(force_moves, fm_chain=None, max_deep=8):
     #     fm_chain = [] if fm_chain is None else fm_chain
     #
@@ -630,7 +662,7 @@ def bot_turn(i, stack, color, difficult=1, configs=None, field_data=None):
     return coord, weight
 
 
-def line_render(stack_render, label=None, fig=None, ax=None):
+def line_render(stack_render, label=None, fig=None, ax=None, moves_num=32):
 
     if (fig is None) or (ax is None):
         fig, ax = init_field()
@@ -641,7 +673,7 @@ def line_render(stack_render, label=None, fig=None, ax=None):
     # Собираем все точки с их цветами для сортировки по глубине
     all_points = []
     for color in stack_render:
-        for i in stack_render[color]:
+        for i in stack_render[color][:moves_num // 2]:
             all_points.append((i, color))
 
     # Сортируем по глубине, если включена сортировка
@@ -661,7 +693,7 @@ def line_render(stack_render, label=None, fig=None, ax=None):
         # Устанавливаем label только для первой точки каждого цвета
         point_label = None
         if color not in first_point_per_color:
-            point_label = f"{label} ({color})" if label else color
+            point_label = f"{label} ({color})" if label else f"{color}: {stack_render[color][moves_num // 2 - 1]}"
             first_point_per_color[color] = True
 
         ax.scatter(*i, s=2000 * coef_s, c=color, marker='h', linewidths=1, # norm=True,

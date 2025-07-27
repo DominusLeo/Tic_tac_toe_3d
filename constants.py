@@ -389,4 +389,12 @@ class Bot_5_lvl(Bot_4_lvl):
         super().__init__()
         self.name = "Bot_5_lvl"
 
-        self.th_points = 4e5
+        self.th_points = 3e4
+        self.almost_fork_weight = 3e4 * 0
+
+    def round_to_const(self, value, constants=None):
+        if constants is None:
+            constants = (0, self.common_3rd_dead_point, self.own_3rd_dead_point,
+                                         self.win_points)
+
+        return min(constants, key=lambda x: abs(x - value))

@@ -1,4 +1,5 @@
 import copy
+import numpy as np
 from tqdm import trange
 import pickle
 
@@ -133,8 +134,15 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
         if turn_weight >= 100000:
             ...
 
-        if i >= 48:
-            ...
+        if i <=66:
+            our_pos_coords = pos_turns(up_layer(stack), stack, color, enemy_color, )
+            our_coords = [i[0] for i in our_pos_coords]
+            our_good_turns = imp_coords_finder(field_data, color, our_coords, stack, enemy_color)
+
+            enemy_pos_coords = pos_turns(up_layer(stack), stack, enemy_color, color)
+            enemy_coords = [i[0] for i in enemy_pos_coords]
+            enemy_good_turns = imp_coords_finder(field_data, enemy_color, enemy_coords, stack, color)
+
 
         if rendering:
             print(turn_weight, '\n\n')
@@ -184,11 +192,14 @@ def single_game(rendering=True, bot_1_configs=None, bot_2_configs=None, Configs=
         if is_win:
             if to_save_res_name:
                 json_saver(stack_weights_to_save, f'{to_save_res_name}.json')
-            print(f"{color} player win")
-
-            if ((Configs.play_vs_bot == 1) and (color == 'black')) \
-                    or ((Configs.play_vs_bot == 2) and (color == 'black')):
-                name = f'{to_save_res_name}.json' if to_save_res_name else f'test_data/bot_loses/enemy_{color}_win_{int(time.time() * 10)}.json'
+            print(f"{color} player win on {i} turn")
+            ...
+            # line_render(stack)
+            if ((Configs.play_vs_bot == 1) and (color == 'black')) or ((Configs.play_vs_bot == 2) and (color == 'black')):
+                if to_save_res_name:
+                    name = f'{to_save_res_name}.json'
+                else:
+                    name = f'test_data/bot_loses/{Configs.bot_difficult}__{Configs.random_seed}__enemy_{color}_win_{int(time.time() * 10)}.json'
                 json_saver(stack_weights_to_save, name)
 
             line_render(stack_render={color: is_win}) if rendering else None
